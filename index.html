@@ -1,24 +1,44 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en" class="light">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>FitMintor - مدربك الذكي للياقة والتغذية</title>
-    <meta name="description" content="تطبيق FitMintor - مدربك الشخصي الذكي للياقة البدنية والتغذية. تتبع السعرات الحرارية، سجل التمارين، واحصل على نصائح مخصصة من الذكاء الاصطناعي." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0ea5e9" />
+    <meta name="color-scheme" content="light dark" />
+    
+    <!-- SEO Meta Tags -->
+    <title>FitMintor - Transform Your Body with AI-Powered Fitness</title>
+    <meta name="description" content="FitMintor is your complete AI-powered fitness platform. Track nutrition, log workouts, analyze body composition, and achieve your fitness goals with personalized AI guidance." />
+    <meta name="keywords" content="fitness app, calorie tracker, workout planner, nutrition tracking, AI fitness, meal logging, body composition, weight loss, muscle gain" />
     <meta name="author" content="FitMintor" />
-    <meta name="theme-color" content="#0D1117" />
-
-    <meta property="og:title" content="FitMintor - مدربك الذكي للياقة والتغذية" />
-    <meta property="og:description" content="تطبيق شامل لتتبع اللياقة والتغذية مع مساعد ذكي يساعدك في تحقيق أهدافك" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@FitMintor" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:url" content="https://fitmintor.com/" />
+    <meta property="og:title" content="FitMintor - AI-Powered Fitness Tracking" />
+    <meta property="og:description" content="Complete platform to achieve your fitness goals with AI support. Track nutrition, workouts, and body composition." />
+    <meta property="og:image" content="/og-image.png" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://fitmintor.com/" />
+    <meta property="twitter:title" content="FitMintor - AI-Powered Fitness Tracking" />
+    <meta property="twitter:description" content="Complete platform to achieve your fitness goals with AI support." />
+    <meta property="twitter:image" content="/og-image.png" />
+    
+    <!-- Canonical -->
+    <link rel="canonical" href="https://fitmintor.com/" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   </head>
-
-  <body class="dark">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
