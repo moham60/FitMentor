@@ -6,11 +6,11 @@ interface BottomNavProps {
 }
 
 const navItems = [
-  { id: 'home', icon: Home, label: 'الرئيسية' },
-  { id: 'nutrition', icon: Utensils, label: 'التغذية' },
-  { id: 'workout', icon: Dumbbell, label: 'التمارين' },
-  { id: 'ai', icon: MessageCircle, label: 'المساعد' },
-  { id: 'profile', icon: User, label: 'حسابي' },
+  { id: 'home', icon: Home, label: 'Home' },
+  { id: 'nutrition', icon: Utensils, label: 'Nutrition' },
+  { id: 'workout', icon: Dumbbell, label: 'Workouts' },
+  { id: 'ai', icon: MessageCircle, label: 'AI' },
+  { id: 'profile', icon: User, label: 'Profile' },
 ];
 
 const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {

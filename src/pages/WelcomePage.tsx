@@ -12,34 +12,30 @@ const WelcomePage = () => {
   const features = [
     {
       icon: TrendingUp,
-      title: 'تدريب احترافي',
-      titleEn: 'Professional Training',
-      description: 'تمارين مخصصة مع تتبع مستمر للتقدم',
+      title: 'Professional Training',
+      description: 'Custom workouts with continuous progress tracking',
     },
     {
       icon: Target,
-      title: 'خطط تغذية ذكية',
-      titleEn: 'Smart Nutrition Plans',
-      description: 'حساب دقيق للسعرات والماكروز',
+      title: 'Smart Nutrition Plans',
+      description: 'Accurate calorie and macro calculations',
     },
     {
       icon: Sparkles,
-      title: 'مساعد ذكاء اصطناعي',
-      titleEn: 'Smart AI Assistant',
-      description: 'إجابات فورية ونصائح مخصصة 24/7',
+      title: 'AI Assistant',
+      description: 'Instant answers and personalized tips 24/7',
     },
     {
       icon: Activity,
-      title: 'تتبع شامل',
-      titleEn: 'Comprehensive Tracking',
-      description: 'راقب وزنك وقياساتك بدقة',
+      title: 'Comprehensive Tracking',
+      description: 'Monitor your weight and measurements precisely',
     },
   ];
 
   const stats = [
-    { value: '4.9', label: 'تقييم المستخدمين', icon: Star },
-    { value: '10K+', label: 'وجبة مسجلة', icon: Flame },
-    { value: '5K+', label: 'مستخدم نشط', icon: Heart },
+    { value: '4.9', label: 'User Rating', icon: Star },
+    { value: '10K+', label: 'Meals Logged', icon: Flame },
+    { value: '5K+', label: 'Active Users', icon: Heart },
   ];
 
   return (
@@ -71,15 +67,15 @@ const WelcomePage = () => {
                 </div>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">FitMintor</span>
-                  <p className="text-xs text-muted-foreground">رفيقك للياقة البدنية</p>
+                  <p className="text-xs text-muted-foreground">Your Fitness Companion</p>
                 </div>
               </div>
 
               <h2 className="text-2xl lg:text-3xl font-display font-bold text-center text-foreground mb-2">
-                ابدأ رحلتك الآن
+                Start Your Journey Now
               </h2>
               <p className="text-muted-foreground text-center mb-8 text-sm">
-                انضم لآلاف المستخدمين الذين حققوا أهدافهم
+                Join thousands of users who achieved their goals
               </p>
 
               <div className="space-y-4">
@@ -87,8 +83,8 @@ const WelcomePage = () => {
                   onClick={() => navigate('/signup')}
                   className="w-full h-14 bg-gradient-primary hover:opacity-90 text-primary-foreground text-base font-semibold rounded-xl shadow-glow transition-all duration-300 hover:scale-[1.02] gap-2"
                 >
-                  إنشاء حساب جديد
-                  <ArrowRight className="w-5 h-5 mr-2" />
+                  Create New Account
+                  <ArrowRight className="w-5 h-5" />
                 </Button>
 
                 <Button
@@ -96,13 +92,13 @@ const WelcomePage = () => {
                   variant="outline"
                   className="w-full h-14 text-base font-semibold rounded-xl border-2 hover:bg-primary/5 transition-all duration-300"
                 >
-                  لدي حساب بالفعل
+                  I Already Have an Account
                 </Button>
               </div>
 
               <div className="flex items-center gap-4 my-8">
                 <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground">أو المتابعة عبر</span>
+                <span className="text-xs text-muted-foreground">Or continue with</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
 
@@ -128,16 +124,16 @@ const WelcomePage = () => {
               </div>
 
               <p className="text-xs text-center text-muted-foreground mt-8">
-                بالمتابعة، أنت توافق على{' '}
-                <a href="#" className="text-primary hover:underline">شروط الاستخدام</a>
-                {' '}و{' '}
-                <a href="#" className="text-primary hover:underline">سياسة الخصوصية</a>
+                By continuing, you agree to our{' '}
+                <a href="#" className="text-primary hover:underline">Terms of Service</a>
+                {' '}and{' '}
+                <a href="#" className="text-primary hover:underline">Privacy Policy</a>
               </p>
             </div>
           </div>
 
           {/* Right Side - Hero Content */}
-          <div className="flex-1 text-center lg:text-right text-primary-foreground order-1 lg:order-2">
+          <div className="flex-1 text-center lg:text-left text-primary-foreground order-1 lg:order-2">
             {/* Hero Image */}
             <div className="relative mb-8 hidden lg:block">
               <div className="absolute -inset-4 bg-gradient-primary/20 rounded-3xl blur-2xl" />
@@ -154,21 +150,21 @@ const WelcomePage = () => {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-foreground">+85%</p>
-                    <p className="text-xs text-muted-foreground">تحسن في اللياقة</p>
+                    <p className="text-xs text-muted-foreground">Fitness Improvement</p>
                   </div>
                 </div>
               </div>
             </div>
 
             <h1 className="text-4xl lg:text-6xl font-display font-bold mb-6 animate-fade-in">
-              حوّل جسمك
+              Transform Your Body
               <br />
-              <span className="bg-gradient-to-l from-primary-foreground to-primary-foreground/70 bg-clip-text text-transparent">
-                بقوة الذكاء الاصطناعي
+              <span className="bg-gradient-to-r from-primary-foreground to-primary-foreground/70 bg-clip-text text-transparent">
+                With the Power of AI
               </span>
             </h1>
-            <p className="text-lg lg:text-xl text-primary-foreground/80 mb-12 max-w-lg mx-auto lg:mx-0 lg:mr-auto animate-fade-in" style={{ animationDelay: '0.2s' }}>
-              منصة متكاملة لتحقيق أهداف لياقتك البدنية مع دعم الذكاء الاصطناعي
+            <p className="text-lg lg:text-xl text-primary-foreground/80 mb-12 max-w-lg mx-auto lg:mx-0 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+              A complete platform to achieve your fitness goals with AI-powered support
             </p>
 
             {/* Features Grid */}
@@ -182,7 +178,7 @@ const WelcomePage = () => {
                   <div className="w-12 h-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center flex-shrink-0">
                     <feature.icon className="w-6 h-6" />
                   </div>
-                  <div className="text-right">
+                  <div className="text-left">
                     <h3 className="font-semibold text-sm">{feature.title}</h3>
                     <p className="text-xs text-primary-foreground/70">{feature.description}</p>
                   </div>

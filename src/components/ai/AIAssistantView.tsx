@@ -11,10 +11,10 @@ interface Message {
 }
 
 const suggestedQuestions = [
-  { icon: Utensils, text: 'اقترح وجبة غداء صحية' },
-  { icon: Dumbbell, text: 'ما أفضل تمارين الصدر؟' },
-  { icon: TrendingUp, text: 'كيف أزيد من حرق الدهون؟' },
-  { icon: Lightbulb, text: 'نصائح لتحسين النوم' },
+  { icon: Utensils, text: 'Suggest a healthy lunch' },
+  { icon: Dumbbell, text: 'Best chest exercises?' },
+  { icon: TrendingUp, text: 'How to burn more fat?' },
+  { icon: Lightbulb, text: 'Tips for better sleep' },
 ];
 
 const AIAssistantView = () => {
@@ -22,7 +22,7 @@ const AIAssistantView = () => {
     {
       id: '1',
       role: 'assistant',
-      content: 'مرحباً! أنا مساعدك الذكي للياقة والتغذية. كيف يمكنني مساعدتك اليوم؟ 💪',
+      content: 'Hello! I\'m your smart fitness and nutrition assistant. How can I help you today? 💪',
       timestamp: new Date(),
     },
   ]);
@@ -44,16 +44,16 @@ const AIAssistantView = () => {
     // Simulate AI response
     setTimeout(() => {
       const responses = [
-        'هذا سؤال رائع! بناءً على أهدافك وبياناتك، أنصحك بـ...',
-        'بالنظر إلى تقدمك الحالي، يمكنني مساعدتك في تحسين...',
-        'لتحقيق أفضل النتائج، أوصي بالتركيز على...',
+        'Great question! Based on your goals and data, I recommend...',
+        'Looking at your current progress, I can help you improve...',
+        'For the best results, I suggest focusing on...',
       ];
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: responses[Math.floor(Math.random() * responses.length)] + '\n\n' +
-          'لقد لاحظت أنك حققت تقدماً ممتازاً هذا الأسبوع! استمر على هذا النمط وستصل لهدفك قريباً. 🎯',
+          'I noticed you\'ve made excellent progress this week! Keep up this pace and you\'ll reach your goal soon. 🎯',
         timestamp: new Date(),
       };
       
@@ -66,7 +66,7 @@ const AIAssistantView = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-180px)] animate-fade-in" dir="rtl">
+    <div className="flex flex-col h-[calc(100vh-180px)] animate-fade-in">
       {/* Header */}
       <div className="mb-4">
         <div className="flex items-center gap-3 mb-2">
@@ -74,10 +74,10 @@ const AIAssistantView = () => {
             <Bot className="w-6 h-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-display font-bold text-foreground">المساعد الذكي</h1>
+            <h1 className="text-2xl font-display font-bold text-foreground">AI Assistant</h1>
             <p className="text-sm text-muted-foreground flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
-              مدعوم بالذكاء الاصطناعي
+              Powered by AI
             </p>
           </div>
         </div>
@@ -92,7 +92,7 @@ const AIAssistantView = () => {
               <button
                 key={idx}
                 onClick={() => handleSuggestion(q.text)}
-                className="flex items-center gap-2 p-3 bg-secondary rounded-xl border border-border hover:border-primary/50 transition-all text-right"
+                className="flex items-center gap-2 p-3 bg-secondary rounded-xl border border-border hover:border-primary/50 transition-all text-left"
               >
                 <Icon className="w-4 h-4 text-primary shrink-0" />
                 <span className="text-sm text-foreground">{q.text}</span>
@@ -141,7 +141,7 @@ const AIAssistantView = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="اكتب سؤالك هنا..."
+          placeholder="Type your question here..."
           className="flex-1 bg-secondary border-border"
         />
         <Button 
@@ -149,7 +149,7 @@ const AIAssistantView = () => {
           size="icon"
           className="shrink-0 bg-gradient-primary hover:opacity-90 shadow-button"
         >
-          <Send className="w-4 h-4 rotate-180" />
+          <Send className="w-4 h-4" />
         </Button>
       </div>
     </div>
