@@ -3,6 +3,8 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   Dumbbell, 
   Plus, 
@@ -12,282 +14,547 @@ import {
   Play,
   CheckCircle,
   Target,
-  ChevronRight
+  ChevronRight,
+  Search,
+  Pause,
+  RotateCcw,
+  Trophy,
+  Zap,
+  Calendar,
+  Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useExercises, useWorkoutPlans, getMuscleGroups, getEquipmentTypes, getDifficultyColor, getGoalInfo, Exercise, WorkoutPlan } from '@/hooks/useExercises';
+import ExerciseCard from '@/components/workout/ExerciseCard';
+
+interface WorkoutSet {
+  reps: number;
+  weight: number;
+  completed: boolean;
+}
+
+interface ActiveExercise {
+  exercise: Exercise;
+  sets: WorkoutSet[];
+}
 
 const WorkoutsPage = () => {
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedMuscle, setSelectedMuscle] = useState('all');
+  const [selectedEquipment, setSelectedEquipment] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeWorkout, setActiveWorkout] = useState<ActiveExercise[]>([]);
+  const [workoutStartTime, setWorkoutStartTime] = useState<Date | null>(null);
+  const [isRestTimerActive, setIsRestTimerActive] = useState(false);
+  const [restSeconds, setRestSeconds] = useState(60);
+  const [showExerciseLibrary, setShowExerciseLibrary] = useState(false);
 
-  const categories = [
-    { id: 'all', name: 'All' },
-    { id: 'strength', name: 'Strength' },
-    { id: 'cardio', name: 'Cardio' },
-    { id: 'flexibility', name: 'Flexibility' },
-    { id: 'hiit', name: 'HIIT' },
-  ];
+  const muscleGroups = getMuscleGroups();
+  const equipmentTypes = getEquipmentTypes();
+  const { exercises, loading: exercisesLoading } = useExercises(selectedMuscle, selectedEquipment, searchQuery);
+  const { plans, loading: plansLoading } = useWorkoutPlans();
 
   const todayStats = {
-    workouts: 2,
-    duration: 45,
-    calories: 320,
-    exercises: 12,
+    workouts: activeWorkout.length > 0 ? 1 : 0,
+    duration: workoutStartTime ? Math.floor((new Date().getTime() - workoutStartTime.getTime()) / 60000) : 0,
+    calories: activeWorkout.reduce((sum, ex) => {
+      const completedSets = ex.sets.filter(s => s.completed).length;
+      return sum + (completedSets * 2 * ex.exercise.calories_per_minute);
+    }, 0),
+    exercises: activeWorkout.filter(ex => ex.sets.some(s => s.completed)).length,
   };
 
-  const workoutPlans = [
-    {
-      id: 1,
-      name: 'Push Day - Chest & Triceps',
-      category: 'strength',
-      duration: 60,
-      exercises: 6,
-      difficulty: 'Intermediate',
-      progress: 75,
-      color: 'primary'
-    },
-    {
-      id: 2,
-      name: 'HIIT Cardio Blast',
-      category: 'hiit',
-      duration: 30,
-      exercises: 8,
-      difficulty: 'Advanced',
-      progress: 0,
-      color: 'orange'
-    },
-    {
-      id: 3,
-      name: 'Full Body Stretch',
-      category: 'flexibility',
-      duration: 20,
-      exercises: 10,
-      difficulty: 'Beginner',
-      progress: 100,
-      color: 'accent'
-    },
-    {
-      id: 4,
-      name: 'Leg Day - Quads Focus',
-      category: 'strength',
-      duration: 55,
-      exercises: 7,
-      difficulty: 'Intermediate',
-      progress: 0,
-      color: 'purple'
-    },
-  ];
+  const handleAddExercise = (exercise: Exercise) => {
+    if (!workoutStartTime) {
+      setWorkoutStartTime(new Date());
+    }
+    
+    const newExercise: ActiveExercise = {
+      exercise,
+      sets: [
+        { reps: 12, weight: 0, completed: false },
+        { reps: 12, weight: 0, completed: false },
+        { reps: 12, weight: 0, completed: false },
+      ]
+    };
+    
+    setActiveWorkout(prev => [...prev, newExercise]);
+    setShowExerciseLibrary(false);
+  };
 
-  const exercises = [
-    { name: 'Bench Press', sets: 4, reps: '8-10', weight: '80kg', completed: true },
-    { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', weight: '30kg', completed: true },
-    { name: 'Cable Flyes', sets: 3, reps: '12-15', weight: '20kg', completed: true },
-    { name: 'Tricep Pushdowns', sets: 3, reps: '12-15', weight: '25kg', completed: false },
-    { name: 'Skull Crushers', sets: 3, reps: '10-12', weight: '30kg', completed: false },
-    { name: 'Dips', sets: 3, reps: 'Max', weight: 'BW', completed: false },
-  ];
+  const handleToggleSet = (exerciseIndex: number, setIndex: number) => {
+    setActiveWorkout(prev => prev.map((ex, ei) => {
+      if (ei === exerciseIndex) {
+        return {
+          ...ex,
+          sets: ex.sets.map((set, si) => {
+            if (si === setIndex) {
+              const newCompleted = !set.completed;
+              if (newCompleted) {
+                // Start rest timer when set is completed
+                setRestSeconds(60);
+                setIsRestTimerActive(true);
+              }
+              return { ...set, completed: newCompleted };
+            }
+            return set;
+          })
+        };
+      }
+      return ex;
+    }));
+  };
+
+  const handleAddSet = (exerciseIndex: number) => {
+    setActiveWorkout(prev => prev.map((ex, ei) => {
+      if (ei === exerciseIndex) {
+        const lastSet = ex.sets[ex.sets.length - 1];
+        return {
+          ...ex,
+          sets: [...ex.sets, { reps: lastSet.reps, weight: lastSet.weight, completed: false }]
+        };
+      }
+      return ex;
+    }));
+  };
+
+  const handleUpdateSet = (exerciseIndex: number, setIndex: number, field: 'reps' | 'weight', value: number) => {
+    setActiveWorkout(prev => prev.map((ex, ei) => {
+      if (ei === exerciseIndex) {
+        return {
+          ...ex,
+          sets: ex.sets.map((set, si) => {
+            if (si === setIndex) {
+              return { ...set, [field]: value };
+            }
+            return set;
+          })
+        };
+      }
+      return ex;
+    }));
+  };
+
+  const completedSetsCount = activeWorkout.reduce((sum, ex) => sum + ex.sets.filter(s => s.completed).length, 0);
+  const totalSetsCount = activeWorkout.reduce((sum, ex) => sum + ex.sets.length, 0);
+  const workoutProgress = totalSetsCount > 0 ? (completedSetsCount / totalSetsCount) * 100 : 0;
 
   return (
     <MainLayout 
-      title="Workouts"
-      subtitle="Track your training sessions"
+      title="التمارين"
+      subtitle="تتبع تمارينك وبناء جسمك المثالي"
     >
       {/* Today's Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card>
+        <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 animate-fade-in">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Dumbbell className="w-6 h-6 text-primary" />
+              <div className="w-14 h-14 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-glow group-hover:scale-110 transition-transform">
+                <Dumbbell className="w-7 h-7 text-white" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{todayStats.workouts}</p>
-                <p className="text-xs text-muted-foreground">Workouts</p>
+                <p className="text-3xl font-bold text-foreground">{todayStats.workouts}</p>
+                <p className="text-xs text-muted-foreground">تمارين</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
-                <Timer className="w-6 h-6 text-accent" />
+              <div className="w-14 h-14 rounded-2xl bg-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Timer className="w-7 h-7 text-accent" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{todayStats.duration}</p>
-                <p className="text-xs text-muted-foreground">Minutes</p>
+                <p className="text-3xl font-bold text-foreground">{todayStats.duration}</p>
+                <p className="text-xs text-muted-foreground">دقيقة</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 animate-fade-in" style={{ animationDelay: '0.2s' }}>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-orange/10 flex items-center justify-center">
-                <Flame className="w-6 h-6 text-orange" />
+              <div className="w-14 h-14 rounded-2xl bg-orange/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Flame className="w-7 h-7 text-orange" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{todayStats.calories}</p>
-                <p className="text-xs text-muted-foreground">Calories</p>
+                <p className="text-3xl font-bold text-foreground">{todayStats.calories}</p>
+                <p className="text-xs text-muted-foreground">سعرة</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 animate-fade-in" style={{ animationDelay: '0.3s' }}>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-purple/10 flex items-center justify-center">
-                <Target className="w-6 h-6 text-purple" />
+              <div className="w-14 h-14 rounded-2xl bg-purple/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Target className="w-7 h-7 text-purple" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{todayStats.exercises}</p>
-                <p className="text-xs text-muted-foreground">Exercises</p>
+                <p className="text-3xl font-bold text-foreground">{todayStats.exercises}</p>
+                <p className="text-xs text-muted-foreground">تمرين مكتمل</p>
               </div>
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Categories */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {categories.map((cat) => (
-          <Button
-            key={cat.id}
-            variant={selectedCategory === cat.id ? 'default' : 'outline'}
-            onClick={() => setSelectedCategory(cat.id)}
-            className={cn(
-              "rounded-full whitespace-nowrap",
-              selectedCategory === cat.id && "bg-gradient-primary shadow-glow"
-            )}
-          >
-            {cat.name}
-          </Button>
-        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Workout Plans */}
-        <div className="lg:col-span-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-foreground">Workout Plans</h2>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Create Plan
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {workoutPlans
-              .filter(w => selectedCategory === 'all' || w.category === selectedCategory)
-              .map((workout) => (
-                <Card key={workout.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center",
-                        workout.color === 'primary' && "bg-primary/10 text-primary",
-                        workout.color === 'orange' && "bg-orange/10 text-orange",
-                        workout.color === 'accent' && "bg-accent/10 text-accent",
-                        workout.color === 'purple' && "bg-purple/10 text-purple"
-                      )}>
-                        <Dumbbell className="w-6 h-6" />
-                      </div>
-                      {workout.progress === 100 ? (
-                        <CheckCircle className="w-6 h-6 text-accent" />
-                      ) : workout.progress > 0 ? (
-                        <span className="text-sm font-bold text-primary">{workout.progress}%</span>
-                      ) : (
-                        <Play className="w-6 h-6 text-muted-foreground" />
-                      )}
+        {/* Current Workout / Start Section */}
+        <div className="lg:col-span-5 space-y-6">
+          {activeWorkout.length > 0 ? (
+            <Card className="animate-fade-in">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow animate-pulse">
+                      <Play className="w-5 h-5 text-white" />
                     </div>
-                    <h3 className="font-bold text-foreground mb-2">{workout.name}</h3>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
-                      <span className="flex items-center gap-1">
-                        <Timer className="w-4 h-4" /> {workout.duration}min
-                      </span>
-                      <span>{workout.exercises} exercises</span>
+                    <div>
+                      <p className="text-lg">تمرين نشط</p>
+                      <p className="text-sm font-normal text-muted-foreground">{todayStats.duration} دقيقة</p>
                     </div>
+                  </CardTitle>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-primary">{Math.round(workoutProgress)}%</p>
+                    <p className="text-xs text-muted-foreground">{completedSetsCount}/{totalSetsCount} مجموعات</p>
+                  </div>
+                </div>
+                <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-primary rounded-full transition-all duration-500"
+                    style={{ width: `${workoutProgress}%` }}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {activeWorkout.map((item, exerciseIndex) => (
+                  <div key={exerciseIndex} className="p-4 rounded-xl bg-muted/50 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className={cn(
-                        "text-xs px-2 py-1 rounded-full",
-                        workout.difficulty === 'Beginner' && "bg-accent/10 text-accent",
-                        workout.difficulty === 'Intermediate' && "bg-warning/10 text-warning",
-                        workout.difficulty === 'Advanced' && "bg-orange/10 text-orange"
-                      )}>
-                        {workout.difficulty}
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-lg">
+                          💪
+                        </div>
+                        <div>
+                          <p className="font-bold text-foreground">{item.exercise.name_ar}</p>
+                          <p className="text-xs text-muted-foreground">{item.exercise.muscle_group}</p>
+                        </div>
+                      </div>
+                      <span className={cn("text-xs px-2 py-1 rounded-full", getDifficultyColor(item.exercise.difficulty))}>
+                        {item.exercise.difficulty === 'beginner' ? 'مبتدئ' : item.exercise.difficulty === 'intermediate' ? 'متوسط' : 'متقدم'}
                       </span>
-                      {workout.progress > 0 && workout.progress < 100 && (
-                        <div className="flex-1 mx-4">
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-gradient-primary rounded-full"
-                              style={{ width: `${workout.progress}%` }}
-                            />
+                    </div>
+                    
+                    {/* Sets */}
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground text-center">
+                        <span>المجموعة</span>
+                        <span>التكرارات</span>
+                        <span>الوزن (kg)</span>
+                        <span>✓</span>
+                      </div>
+                      {item.sets.map((set, setIndex) => (
+                        <div key={setIndex} className="grid grid-cols-4 gap-2 items-center">
+                          <span className={cn(
+                            "text-center font-bold text-sm rounded-lg py-2",
+                            set.completed ? "bg-accent text-accent-foreground" : "bg-muted"
+                          )}>
+                            {setIndex + 1}
+                          </span>
+                          <Input
+                            type="number"
+                            value={set.reps}
+                            onChange={(e) => handleUpdateSet(exerciseIndex, setIndex, 'reps', parseInt(e.target.value) || 0)}
+                            className="h-10 text-center"
+                          />
+                          <Input
+                            type="number"
+                            value={set.weight}
+                            onChange={(e) => handleUpdateSet(exerciseIndex, setIndex, 'weight', parseInt(e.target.value) || 0)}
+                            className="h-10 text-center"
+                          />
+                          <Button
+                            size="sm"
+                            variant={set.completed ? 'default' : 'outline'}
+                            onClick={() => handleToggleSet(exerciseIndex, setIndex)}
+                            className={cn(
+                              "h-10 w-full transition-all",
+                              set.completed && "bg-accent hover:bg-accent/90"
+                            )}
+                          >
+                            <CheckCircle className="w-5 h-5" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleAddSet(exerciseIndex)}
+                        className="w-full gap-2 text-primary"
+                      >
+                        <Plus className="w-4 h-4" />
+                        أضف مجموعة
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                
+                <Button 
+                  onClick={() => setShowExerciseLibrary(true)}
+                  className="w-full bg-gradient-primary shadow-glow gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  أضف تمرين
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="animate-fade-in">
+              <CardContent className="py-12 text-center">
+                <div className="w-24 h-24 rounded-full bg-gradient-primary mx-auto flex items-center justify-center shadow-glow mb-6">
+                  <Dumbbell className="w-12 h-12 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-foreground mb-2">ابدأ تمرينك</h3>
+                <p className="text-muted-foreground mb-6">اختر تمرين من المكتبة أو ابدأ خطة جاهزة</p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button 
+                    onClick={() => setShowExerciseLibrary(true)}
+                    className="bg-gradient-primary shadow-glow gap-2"
+                  >
+                    <Plus className="w-5 h-5" />
+                    تمرين مخصص
+                  </Button>
+                  <Button variant="outline" className="gap-2">
+                    <Play className="w-5 h-5" />
+                    اختر خطة
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Workout Plans */}
+          <div>
+            <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+              <span className="text-xl">📋</span>
+              خطط التمارين
+            </h3>
+            <div className="space-y-3">
+              {plansLoading ? (
+                [1, 2, 3].map(i => (
+                  <Card key={i} className="animate-pulse">
+                    <CardContent className="p-4">
+                      <div className="h-16 bg-muted rounded" />
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                plans.map((plan, index) => {
+                  const goalInfo = getGoalInfo(plan.goal);
+                  return (
+                    <Card 
+                      key={plan.id} 
+                      className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] animate-fade-in"
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-4">
+                          <div className={cn(
+                            "w-14 h-14 rounded-2xl flex items-center justify-center text-2xl",
+                            goalInfo.color === 'primary' && "bg-primary/20",
+                            goalInfo.color === 'orange' && "bg-orange/20",
+                            goalInfo.color === 'purple' && "bg-purple/20",
+                            goalInfo.color === 'accent' && "bg-accent/20"
+                          )}>
+                            {goalInfo.icon}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-bold text-foreground">{plan.name_ar}</p>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {plan.duration_weeks} أسابيع
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {plan.days_per_week} أيام/أسبوع
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={cn("text-xs px-2 py-1 rounded-full", getDifficultyColor(plan.difficulty))}>
+                              {plan.difficulty === 'beginner' ? 'مبتدئ' : plan.difficulty === 'intermediate' ? 'متوسط' : 'متقدم'}
+                            </span>
+                            {plan.is_premium && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-warning/10 text-warning flex items-center gap-1">
+                                <Trophy className="w-3 h-3" />
+                                بريميوم
+                              </span>
+                            )}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Current Workout */}
-        <div className="lg:col-span-4">
+        {/* Exercise Library */}
+        <div className="lg:col-span-7 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Play className="w-5 h-5 text-primary" />
-                Current Session
+                <span className="text-xl">💪</span>
+                مكتبة التمارين
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="mb-4">
-                <h3 className="font-bold text-foreground">Push Day - Chest & Triceps</h3>
-                <p className="text-sm text-muted-foreground">3 of 6 exercises completed</p>
+            <CardContent className="space-y-4">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  placeholder="ابحث عن تمرين..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pr-10 h-12"
+                  dir="rtl"
+                />
               </div>
-              <div className="space-y-3">
-                {exercises.map((exercise, index) => (
-                  <div 
-                    key={index}
-                    className={cn(
-                      "flex items-center justify-between p-3 rounded-lg transition-colors",
-                      exercise.completed 
-                        ? "bg-accent/10 border border-accent/20" 
-                        : "bg-muted/50"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
-                        exercise.completed 
-                          ? "bg-accent text-accent-foreground" 
-                          : "bg-muted text-muted-foreground"
-                      )}>
-                        {exercise.completed ? '✓' : index + 1}
-                      </div>
-                      <div>
-                        <p className={cn(
-                          "font-medium",
-                          exercise.completed ? "text-accent" : "text-foreground"
-                        )}>
-                          {exercise.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {exercise.sets} sets × {exercise.reps} @ {exercise.weight}
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+
+              {/* Muscle Groups */}
+              <ScrollArea className="w-full" dir="rtl">
+                <div className="flex gap-2 pb-2">
+                  {muscleGroups.map((muscle) => (
+                    <Button
+                      key={muscle.id}
+                      variant={selectedMuscle === muscle.id ? 'default' : 'outline'}
+                      onClick={() => setSelectedMuscle(muscle.id)}
+                      size="sm"
+                      className={cn(
+                        "rounded-full whitespace-nowrap gap-1 transition-all",
+                        selectedMuscle === muscle.id && "bg-gradient-primary shadow-glow"
+                      )}
+                    >
+                      <span>{muscle.icon}</span>
+                      {muscle.name_ar}
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
+
+              {/* Equipment Filter */}
+              <ScrollArea className="w-full" dir="rtl">
+                <div className="flex gap-2 pb-2">
+                  {equipmentTypes.map((eq) => (
+                    <Button
+                      key={eq.id}
+                      variant={selectedEquipment === eq.id ? 'default' : 'ghost'}
+                      onClick={() => setSelectedEquipment(eq.id)}
+                      size="sm"
+                      className="rounded-full whitespace-nowrap text-xs"
+                    >
+                      {eq.name_ar}
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
+
+              {/* Exercise List */}
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                {exercisesLoading ? (
+                  [1, 2, 3, 4].map(i => (
+                    <Card key={i} className="animate-pulse">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-14 h-14 rounded-xl bg-muted" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-muted rounded w-3/4" />
+                            <div className="h-3 bg-muted rounded w-1/2" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : exercises.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">لا توجد تمارين</p>
                   </div>
-                ))}
+                ) : (
+                  exercises.map((exercise, index) => (
+                    <div key={exercise.id} style={{ animationDelay: `${index * 0.05}s` }}>
+                      <ExerciseCard 
+                        exercise={exercise} 
+                        onSelect={handleAddExercise}
+                      />
+                    </div>
+                  ))
+                )}
               </div>
-              <Button className="w-full mt-4 bg-gradient-primary text-primary-foreground shadow-glow">
-                Continue Workout
-              </Button>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Exercise Library Dialog for mobile */}
+      <Dialog open={showExerciseLibrary} onOpenChange={setShowExerciseLibrary}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>اختر تمرين</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                placeholder="ابحث عن تمرين..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-10"
+                dir="rtl"
+              />
+            </div>
+            <ScrollArea className="w-full" dir="rtl">
+              <div className="flex gap-2 pb-2">
+                {muscleGroups.map((muscle) => (
+                  <Button
+                    key={muscle.id}
+                    variant={selectedMuscle === muscle.id ? 'default' : 'outline'}
+                    onClick={() => setSelectedMuscle(muscle.id)}
+                    size="sm"
+                    className="rounded-full whitespace-nowrap"
+                  >
+                    {muscle.icon} {muscle.name_ar}
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {exercises.slice(0, 10).map((exercise) => (
+                <Card 
+                  key={exercise.id}
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => handleAddExercise(exercise)}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        💪
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">{exercise.name_ar}</p>
+                        <p className="text-xs text-muted-foreground">{exercise.muscle_group}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 };
