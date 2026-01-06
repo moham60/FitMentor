@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 
 const DashboardView = () => {
   const userData = {
-    name: 'أحمد',
+    name: 'Ahmed',
     calories: { consumed: 1450, target: 2200 },
     macros: {
       protein: { current: 95, target: 154 },
@@ -17,18 +17,18 @@ const DashboardView = () => {
   };
 
   return (
-    <div className="pb-24 animate-fade-in" dir="rtl">
+    <div className="pb-24 animate-fade-in">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <p className="text-muted-foreground text-sm">صباح الخير</p>
+          <p className="text-muted-foreground text-sm">Good morning</p>
           <h1 className="text-2xl font-display font-bold text-foreground">
             {userData.name} 👋
           </h1>
         </div>
         <div className="flex items-center gap-2 bg-accent/20 rounded-full px-3 py-1.5">
           <Flame className="w-4 h-4 text-accent" />
-          <span className="text-sm font-semibold text-accent">{userData.streak} يوم</span>
+          <span className="text-sm font-semibold text-accent">{userData.streak} days</span>
         </div>
       </div>
 
@@ -45,14 +45,14 @@ const DashboardView = () => {
               <p className="text-2xl font-bold text-foreground">
                 {userData.calories.consumed}
               </p>
-              <p className="text-xs text-muted-foreground">مستهلكة</p>
+              <p className="text-xs text-muted-foreground">Consumed</p>
             </div>
             <div className="w-px bg-border" />
             <div className="text-center">
               <p className="text-2xl font-bold text-foreground">
                 {userData.calories.target}
               </p>
-              <p className="text-xs text-muted-foreground">الهدف</p>
+              <p className="text-xs text-muted-foreground">Target</p>
             </div>
           </div>
         </div>
@@ -62,23 +62,23 @@ const DashboardView = () => {
       <div className="bg-gradient-card rounded-2xl p-5 border border-border/50 shadow-card mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Target className="w-5 h-5 text-primary" />
-          <h2 className="font-display font-semibold text-foreground">الماكروز</h2>
+          <h2 className="font-display font-semibold text-foreground">Macros</h2>
         </div>
         <div className="space-y-4">
           <MacroBar 
-            label="بروتين" 
+            label="Protein" 
             current={userData.macros.protein.current} 
             target={userData.macros.protein.target}
             color="primary"
           />
           <MacroBar 
-            label="كربوهيدرات" 
+            label="Carbs" 
             current={userData.macros.carbs.current} 
             target={userData.macros.carbs.target}
             color="warning"
           />
           <MacroBar 
-            label="دهون" 
+            label="Fat" 
             current={userData.macros.fat.current} 
             target={userData.macros.fat.target}
             color="accent"
@@ -95,7 +95,7 @@ const DashboardView = () => {
           <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
             <Plus className="w-5 h-5 text-primary" />
           </div>
-          <span className="font-medium">سجّل وجبة</span>
+          <span className="font-medium">Log Meal</span>
         </Button>
         <Button 
           variant="secondary" 
@@ -104,7 +104,7 @@ const DashboardView = () => {
           <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
             <Play className="w-5 h-5 text-accent" />
           </div>
-          <span className="font-medium">ابدأ التمرين</span>
+          <span className="font-medium">Start Workout</span>
         </Button>
       </div>
 
@@ -113,17 +113,17 @@ const DashboardView = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-success" />
-            <h2 className="font-display font-semibold text-foreground">تقدم الوزن</h2>
+            <h2 className="font-display font-semibold text-foreground">Weight Progress</h2>
           </div>
-          <span className="text-xs text-muted-foreground">آخر 7 أيام</span>
+          <span className="text-xs text-muted-foreground">Last 7 days</span>
         </div>
         <div className="flex items-baseline gap-2 mt-4">
           <span className="text-4xl font-display font-bold text-foreground">
             {userData.weight.current}
           </span>
-          <span className="text-muted-foreground">كيلو</span>
-          <span className="text-success text-sm mr-auto">
-            -{(userData.weight.previous - userData.weight.current).toFixed(1)} كجم
+          <span className="text-muted-foreground">kg</span>
+          <span className="text-success text-sm ml-auto">
+            -{(userData.weight.previous - userData.weight.current).toFixed(1)} kg
           </span>
         </div>
       </div>
