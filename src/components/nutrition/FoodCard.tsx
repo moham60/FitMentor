@@ -21,10 +21,10 @@ const FoodCard = ({ food, onAddFood }: FoodCardProps) => {
   const macros = calculateMacros(food, quantity);
 
   const mealTypes = [
-    { id: 'breakfast', name: 'فطور', icon: '☀️' },
-    { id: 'lunch', name: 'غداء', icon: '🌤️' },
-    { id: 'dinner', name: 'عشاء', icon: '🌙' },
-    { id: 'snack', name: 'سناك', icon: '🍎' },
+    { id: 'breakfast', name: 'Breakfast', icon: '☀️' },
+    { id: 'lunch', name: 'Lunch', icon: '🌤️' },
+    { id: 'dinner', name: 'Dinner', icon: '🌙' },
+    { id: 'snack', name: 'Snack', icon: '🍎' },
   ];
 
   const handleAdd = () => {
@@ -62,7 +62,7 @@ const FoodCard = ({ food, onAddFood }: FoodCardProps) => {
                 <p className="text-xs text-muted-foreground truncate">{food.name_en}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-sm font-bold text-primary">{food.calories_per_100g}</span>
-                  <span className="text-xs text-muted-foreground">سعرة / 100 جرام</span>
+                  <span className="text-xs text-muted-foreground">kcal / 100g</span>
                 </div>
               </div>
               <Button size="icon" variant="ghost" className="shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
@@ -73,7 +73,7 @@ const FoodCard = ({ food, onAddFood }: FoodCardProps) => {
         </Card>
       </DialogTrigger>
       
-      <DialogContent className="sm:max-w-md" dir="rtl">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span className="text-3xl">{getFoodIcon(food.food_type)}</span>
@@ -88,8 +88,8 @@ const FoodCard = ({ food, onAddFood }: FoodCardProps) => {
           {/* Quantity Slider */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">الكمية</span>
-              <span className="text-2xl font-bold text-primary">{quantity} جرام</span>
+              <span className="text-sm font-medium">Quantity</span>
+              <span className="text-2xl font-bold text-primary">{quantity}g</span>
             </div>
             <Slider
               value={[quantity]}
@@ -100,7 +100,7 @@ const FoodCard = ({ food, onAddFood }: FoodCardProps) => {
               className="w-full"
             />
             <p className="text-xs text-muted-foreground text-center">
-              الحصة المقترحة: {food.serving_description} ({food.serving_size_g} جرام)
+              Suggested: {food.serving_description} ({food.serving_size_g}g)
             </p>
           </div>
 
@@ -109,28 +109,28 @@ const FoodCard = ({ food, onAddFood }: FoodCardProps) => {
             <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 text-center">
               <Flame className="w-6 h-6 mx-auto mb-2 text-primary" />
               <p className="text-2xl font-bold text-foreground">{calories}</p>
-              <p className="text-xs text-muted-foreground">سعرة حرارية</p>
+              <p className="text-xs text-muted-foreground">Calories</p>
             </div>
             <div className="p-4 rounded-xl bg-orange/10 text-center">
               <Beef className="w-6 h-6 mx-auto mb-2 text-orange" />
               <p className="text-2xl font-bold text-foreground">{macros.protein}g</p>
-              <p className="text-xs text-muted-foreground">بروتين</p>
+              <p className="text-xs text-muted-foreground">Protein</p>
             </div>
             <div className="p-4 rounded-xl bg-accent/10 text-center">
               <Wheat className="w-6 h-6 mx-auto mb-2 text-accent" />
               <p className="text-2xl font-bold text-foreground">{macros.carbs}g</p>
-              <p className="text-xs text-muted-foreground">كربوهيدرات</p>
+              <p className="text-xs text-muted-foreground">Carbs</p>
             </div>
             <div className="p-4 rounded-xl bg-purple/10 text-center">
               <Droplet className="w-6 h-6 mx-auto mb-2 text-purple" />
               <p className="text-2xl font-bold text-foreground">{macros.fat}g</p>
-              <p className="text-xs text-muted-foreground">دهون</p>
+              <p className="text-xs text-muted-foreground">Fat</p>
             </div>
           </div>
 
           {/* Meal Selection */}
           <div className="space-y-3">
-            <span className="text-sm font-medium">أضف إلى وجبة</span>
+            <span className="text-sm font-medium">Add to meal</span>
             <div className="grid grid-cols-4 gap-2">
               {mealTypes.map((meal) => (
                 <button
@@ -152,7 +152,7 @@ const FoodCard = ({ food, onAddFood }: FoodCardProps) => {
 
           <Button onClick={handleAdd} className="w-full bg-gradient-primary shadow-glow gap-2">
             <Plus className="w-5 h-5" />
-            أضف {calories} سعرة
+            Add {calories} kcal
           </Button>
         </div>
       </DialogContent>
