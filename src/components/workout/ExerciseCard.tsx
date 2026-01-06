@@ -29,16 +29,39 @@ const ExerciseCard = ({ exercise, onSelect, showDetails = true }: ExerciseCardPr
     return icons[muscle] || '💪';
   };
 
-  const getEquipmentIcon = (equipment: string) => {
-    const icons: Record<string, string> = {
-      barbell: '🏋️',
-      dumbbell: '🪨',
-      cable: '🔗',
-      machine: '⚙️',
-      bodyweight: '🧘',
-      kettlebell: '🔔',
+  const getEquipmentLabel = (equipment: string) => {
+    const labels: Record<string, string> = {
+      barbell: 'Barbell',
+      dumbbell: 'Dumbbell',
+      cable: 'Cable',
+      machine: 'Machine',
+      bodyweight: 'Bodyweight',
+      kettlebell: 'Kettlebell',
     };
-    return icons[equipment] || '💪';
+    return labels[equipment] || equipment;
+  };
+
+  const getDifficultyLabel = (difficulty: string) => {
+    const labels: Record<string, string> = {
+      beginner: 'Beginner',
+      intermediate: 'Intermediate',
+      advanced: 'Advanced',
+    };
+    return labels[difficulty] || difficulty;
+  };
+
+  const getMuscleLabel = (muscle: string) => {
+    const labels: Record<string, string> = {
+      chest: 'Chest',
+      back: 'Back',
+      shoulders: 'Shoulders',
+      biceps: 'Biceps',
+      triceps: 'Triceps',
+      legs: 'Legs',
+      abs: 'Abs',
+      cardio: 'Cardio',
+    };
+    return labels[muscle] || muscle;
   };
 
   return (
@@ -55,11 +78,10 @@ const ExerciseCard = ({ exercise, onSelect, showDetails = true }: ExerciseCardPr
                 <p className="text-xs text-muted-foreground">{exercise.name_en}</p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span className={cn("text-xs px-2 py-0.5 rounded-full", getDifficultyColor(exercise.difficulty))}>
-                    {exercise.difficulty === 'beginner' ? 'مبتدئ' : exercise.difficulty === 'intermediate' ? 'متوسط' : 'متقدم'}
+                    {getDifficultyLabel(exercise.difficulty)}
                   </span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    {getEquipmentIcon(exercise.equipment)}
-                    {exercise.equipment}
+                  <span className="text-xs text-muted-foreground">
+                    {getEquipmentLabel(exercise.equipment)}
                   </span>
                 </div>
               </div>
@@ -70,7 +92,7 @@ const ExerciseCard = ({ exercise, onSelect, showDetails = true }: ExerciseCardPr
       </DialogTrigger>
       
       {showDetails && (
-        <DialogContent className="sm:max-w-lg" dir="rtl">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-3xl">
@@ -88,25 +110,25 @@ const ExerciseCard = ({ exercise, onSelect, showDetails = true }: ExerciseCardPr
             <div className="grid grid-cols-3 gap-3">
               <div className="p-3 rounded-xl bg-muted/50 text-center">
                 <Dumbbell className="w-5 h-5 mx-auto mb-1 text-primary" />
-                <p className="text-sm font-bold">{exercise.muscle_group}</p>
-                <p className="text-xs text-muted-foreground">العضلة الرئيسية</p>
+                <p className="text-sm font-bold">{getMuscleLabel(exercise.muscle_group)}</p>
+                <p className="text-xs text-muted-foreground">Primary Muscle</p>
               </div>
               <div className="p-3 rounded-xl bg-muted/50 text-center">
                 <Timer className="w-5 h-5 mx-auto mb-1 text-accent" />
-                <p className="text-sm font-bold">{getEquipmentIcon(exercise.equipment)}</p>
-                <p className="text-xs text-muted-foreground">{exercise.equipment}</p>
+                <p className="text-sm font-bold">{getEquipmentLabel(exercise.equipment)}</p>
+                <p className="text-xs text-muted-foreground">Equipment</p>
               </div>
               <div className="p-3 rounded-xl bg-muted/50 text-center">
                 <Flame className="w-5 h-5 mx-auto mb-1 text-orange" />
                 <p className="text-sm font-bold">{exercise.calories_per_minute}</p>
-                <p className="text-xs text-muted-foreground">سعرة/دقيقة</p>
+                <p className="text-xs text-muted-foreground">Cal/Min</p>
               </div>
             </div>
 
             {/* Secondary Muscles */}
             {exercise.secondary_muscles && exercise.secondary_muscles.length > 0 && (
               <div>
-                <p className="text-sm font-medium mb-2">العضلات الثانوية</p>
+                <p className="text-sm font-medium mb-2">Secondary Muscles</p>
                 <div className="flex flex-wrap gap-2">
                   {exercise.secondary_muscles.map((muscle, i) => (
                     <span key={i} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
@@ -118,23 +140,23 @@ const ExerciseCard = ({ exercise, onSelect, showDetails = true }: ExerciseCardPr
             )}
 
             {/* Instructions */}
-            {exercise.instructions_ar && (
+            {exercise.instructions_en && (
               <div className="p-4 rounded-xl bg-muted/50">
                 <div className="flex items-center gap-2 mb-2">
                   <Info className="w-4 h-4 text-primary" />
-                  <p className="font-medium">طريقة الأداء</p>
+                  <p className="font-medium">How to Perform</p>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  {exercise.instructions_ar}
+                  {exercise.instructions_en}
                 </p>
               </div>
             )}
 
             {/* Tips */}
-            {exercise.tips_ar && (
+            {exercise.tips_en && (
               <div className="p-4 rounded-xl bg-accent/10 border border-accent/20">
-                <p className="font-medium text-accent mb-1">💡 نصيحة</p>
-                <p className="text-sm text-muted-foreground">{exercise.tips_ar}</p>
+                <p className="font-medium text-accent mb-1">💡 Pro Tip</p>
+                <p className="text-sm text-muted-foreground">{exercise.tips_en}</p>
               </div>
             )}
 
@@ -146,7 +168,7 @@ const ExerciseCard = ({ exercise, onSelect, showDetails = true }: ExerciseCardPr
               className="w-full bg-gradient-primary shadow-glow gap-2"
             >
               <Play className="w-5 h-5" />
-              أضف للتمرين
+              Add to Workout
             </Button>
           </div>
         </DialogContent>
