@@ -2,7 +2,7 @@ The only requirement is having Node.js & npm installed - [install with nvm](http
 Follow these steps:
 ```sh
 # Step 1: Clone the repository using the project's Git URL.
-git clone <GIT_URL>
+git clone https://github.com/Fares-shereif/fitmentor.git
 
 # Step 2: Navigate to the project directory.
 cd <PROJECT_NAME>
