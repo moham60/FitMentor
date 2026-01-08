@@ -2,23 +2,20 @@ import { useEffect, useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Flame, 
-  Beef, 
-  Wheat, 
-  Droplet, 
-  TrendingUp, 
+import {
+  Flame,
+  Beef,
+  Wheat,
+  Droplet,
+  TrendingUp,
   Dumbbell,
   Plus,
-  Lightbulb,
   Scale,
   Target,
   ArrowRight,
   Sparkles,
-  Activity,
-  Calendar,
   Trophy,
-  Zap
+  Play,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -38,63 +35,90 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!user) return;
-      
-      const { data } = await supabase
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
         .from('profiles')
         .select('full_name, daily_calories, weight_kg, goal')
         .eq('user_id', user.id)
         .maybeSingle();
-      
-      setProfile(data);
+
+      if (error) {
+        console.error('fetchProfile error:', error);
+      }
+
+      setProfile((data as Profile) ?? null);
       setLoading(false);
     };
 
     fetchProfile();
-  }, [user]);
+  }, [user?.id]);
 
-  const dailyCalories = { consumed: 1850, target: profile?.daily_calories || 2400 };
+  // loading state (مهم عشان ميبقاش فيه flicker)
+  if (loading) {
+    return (
+      <MainLayout title="Loading..." subtitle="Please wait">
+        <div className="p-6">
+          <Card className="animate-pulse">
+            <CardContent className="p-6">
+              <div className="h-6 w-40 bg-muted rounded mb-4" />
+              <div className="h-4 w-64 bg-muted rounded mb-2" />
+              <div className="h-4 w-52 bg-muted rounded" />
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const dailyTarget = profile?.daily_calories || 2400;
+
+  const dailyCalories = { consumed: 1850, target: dailyTarget };
+
   const macros = {
-    protein: { current: 120, target: Math.round((profile?.daily_calories || 2400) * 0.3 / 4) },
-    carbs: { current: 180, target: Math.round((profile?.daily_calories || 2400) * 0.4 / 4) },
-    fat: { current: 55, target: Math.round((profile?.daily_calories || 2400) * 0.3 / 9) },
+    protein: { current: 120, target: Math.round(dailyTarget * 0.3 / 4) },
+    carbs: { current: 180, target: Math.round(dailyTarget * 0.4 / 4) },
+    fat: { current: 55, target: Math.round(dailyTarget * 0.3 / 9) },
   };
 
   const stats = [
-    { 
-      label: 'السعرات', 
-      value: dailyCalories.consumed, 
+    {
+      label: 'السعرات',
+      value: dailyCalories.consumed,
       target: dailyCalories.target,
-      icon: Flame, 
+      icon: Flame,
       color: 'primary',
-      unit: 'سعرة'
+      unit: 'سعرة',
     },
-    { 
-      label: 'البروتين', 
-      value: macros.protein.current, 
+    {
+      label: 'البروتين',
+      value: macros.protein.current,
       target: macros.protein.target,
-      icon: Beef, 
+      icon: Beef,
       color: 'orange',
-      unit: 'جرام'
+      unit: 'جرام',
     },
-    { 
-      label: 'الكربوهيدرات', 
-      value: macros.carbs.current, 
+    {
+      label: 'الكربوهيدرات',
+      value: macros.carbs.current,
       target: macros.carbs.target,
-      icon: Wheat, 
+      icon: Wheat,
       color: 'accent',
-      unit: 'جرام'
+      unit: 'جرام',
     },
-    { 
-      label: 'الدهون', 
-      value: macros.fat.current, 
+    {
+      label: 'الدهون',
+      value: macros.fat.current,
       target: macros.fat.target,
-      icon: Droplet, 
+      icon: Droplet,
       color: 'purple',
-      unit: 'جرام'
+      unit: 'جرام',
     },
   ];
 
@@ -128,14 +152,17 @@ const DashboardPage = () => {
   const circumference = 2 * Math.PI * 80;
   const strokeDashoffset = circumference - (caloriePercent / 100) * circumference;
 
-  const firstName = profile?.full_name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'صديقنا';
+  const firstName =
+    profile?.full_name?.split(' ')[0] ||
+    user?.user_metadata?.full_name?.split(' ')[0] ||
+    'صديقنا';
 
   return (
-    <MainLayout 
+    <MainLayout
       title={`مرحباً، ${firstName}!`}
       subtitle="إليك ملخص لياقتك البدنية لهذا اليوم"
     >
-      {/* Welcome Banner with Image */}
+      {/* Welcome Banner */}
       <Card className="relative overflow-hidden mb-8 bg-gradient-to-r from-primary/10 via-accent/5 to-purple/10 border-none animate-fade-in">
         <div className="absolute inset-0 opacity-20">
           <img src={heroNutrition} alt="" className="w-full h-full object-cover" />
@@ -153,7 +180,7 @@ const DashboardPage = () => {
             </div>
             <div className="flex gap-3">
               {quickActions.slice(0, 2).map((action, i) => (
-                <Button 
+                <Button
                   key={i}
                   onClick={() => navigate(action.path)}
                   className={cn(
@@ -174,8 +201,8 @@ const DashboardPage = () => {
       {/* Quick Actions Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {quickActions.map((action, index) => (
-          <Card 
-            key={index} 
+          <Card
+            key={index}
             className="group cursor-pointer hover:shadow-lg transition-all duration-300 hover:scale-105 animate-fade-in card-hover"
             style={{ animationDelay: `${index * 0.1}s` }}
             onClick={() => navigate(action.path)}
@@ -201,8 +228,8 @@ const DashboardPage = () => {
         {stats.map((stat, index) => {
           const percent = Math.round((stat.value / stat.target) * 100);
           return (
-            <Card 
-              key={index} 
+            <Card
+              key={index}
               className="relative overflow-hidden hover:shadow-lg transition-all duration-300 animate-fade-in group"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
@@ -234,7 +261,7 @@ const DashboardPage = () => {
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
                 <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className={cn(
                       "h-full rounded-full transition-all duration-1000",
                       stat.color === 'primary' && "bg-gradient-primary",
@@ -266,14 +293,7 @@ const DashboardPage = () => {
           <CardContent className="flex flex-col items-center">
             <div className="relative w-48 h-48">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 180 180">
-                <circle
-                  cx="90"
-                  cy="90"
-                  r="80"
-                  fill="none"
-                  stroke="hsl(var(--muted))"
-                  strokeWidth="14"
-                />
+                <circle cx="90" cy="90" r="80" fill="none" stroke="hsl(var(--muted))" strokeWidth="14" />
                 <circle
                   cx="90"
                   cy="90"
@@ -324,7 +344,7 @@ const DashboardPage = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             {meals.map((meal, index) => (
-              <div 
+              <div
                 key={index}
                 className="flex items-center justify-between p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors group"
               >
@@ -376,7 +396,7 @@ const DashboardPage = () => {
                     <span className="text-xl font-bold text-foreground">{workout.progress}%</span>
                   </div>
                   <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className={cn(
                         "h-full rounded-full transition-all duration-1000",
                         workout.color === 'primary' && "bg-gradient-primary",
@@ -389,7 +409,7 @@ const DashboardPage = () => {
                 </div>
               </div>
             ))}
-            <Button 
+            <Button
               className="w-full mt-4 bg-gradient-primary shadow-glow gap-2 hover:scale-[1.02] transition-transform"
               onClick={() => navigate('/workouts')}
             >
@@ -414,7 +434,7 @@ const DashboardPage = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             {insights.map((insight, index) => (
-              <div 
+              <div
                 key={index}
                 className={cn(
                   "flex gap-4 p-4 rounded-xl border-r-4 transition-all hover:scale-[1.01]",
@@ -470,7 +490,7 @@ const DashboardPage = () => {
               </div>
             </div>
             <div className="h-3 bg-muted rounded-full overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-1000"
                 style={{ width: '31%' }}
               />
@@ -482,12 +502,5 @@ const DashboardPage = () => {
     </MainLayout>
   );
 };
-
-// Add missing Play icon
-const Play = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-  </svg>
-);
 
 export default DashboardPage;

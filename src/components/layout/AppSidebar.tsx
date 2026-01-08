@@ -11,13 +11,15 @@ import {
   BarChart3,
   Target,
   Menu,
-  X
+  X,
+  BicepsFlexed
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { icon: Home, label: 'Dashboard', path: '/dashboard' },
+  { icon: BicepsFlexed, label: 'Exercises', path: '/Exercises' },
   { icon: Utensils, label: 'Nutrition', path: '/nutrition' },
   { icon: Dumbbell, label: 'Workouts', path: '/workouts' },
   { icon: BarChart3, label: 'InBody', path: '/inbody' },

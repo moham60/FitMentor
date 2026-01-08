@@ -16,6 +16,7 @@ import NutritionPage from "./pages/NutritionPage";
 import WorkoutsPage from "./pages/WorkoutsPage";
 import InBodyPage from "./pages/InBodyPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
+import ExercisesPage from "./pages/ExercisesPage";
 import GoalsPage from "./pages/GoalsPage";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
@@ -76,6 +77,7 @@ const AppRoutes = () => {
       <Route path="/workouts" element={<ProtectedRoute><WorkoutsPage /></ProtectedRoute>} />
       <Route path="/inbody" element={<ProtectedRoute><InBodyPage /></ProtectedRoute>} />
       <Route path="/ai" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
+      <Route path="/Exercises" element={<ProtectedRoute><ExercisesPage /></ProtectedRoute>} />
       <Route path="/goals" element={<ProtectedRoute><GoalsPage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
