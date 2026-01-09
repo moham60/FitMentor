@@ -1,40 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+
+
 import { 
-  Home, 
-  Utensils, 
   Dumbbell, 
-  Sparkles, 
-  User, 
   LogOut,
-  Settings,
-  BarChart3,
-  Target,
   Menu,
   X,
-  BicepsFlexed
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { NavType } from '@/types/navLinks';
+import { coachNavItems, userNavItems } from '@/lib/NavLinks';
 
-const navItems = [
-  { icon: Home, label: 'Dashboard', path: '/dashboard' },
-  { icon: BicepsFlexed, label: 'Exercises', path: '/Exercises' },
-  { icon: Utensils, label: 'Nutrition', path: '/nutrition' },
-  { icon: Dumbbell, label: 'Workouts', path: '/workouts' },
-  { icon: BarChart3, label: 'InBody', path: '/inbody' },
-  { icon: Sparkles, label: 'AI Assistant', path: '/ai' },
-  { icon: Target, label: 'Goals', path: '/goals' },
-  { icon: User, label: 'Profile', path: '/profile' },
-  { icon: Settings, label: 'Settings', path: '/settings' },
-];
+
+
 
 const AppSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut, user } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-
+  const [navItems,setNavItems]=useState<null|NavType[]>(null)
   const handleNavClick = (path: string) => {
     navigate(path);
     setIsMobileOpen(false);
@@ -44,7 +31,19 @@ const AppSidebar = () => {
     await signOut();
     navigate('/');
   };
-
+  const handleStateNavItems = () => {
+    if (user.user_metadata.account_type == "coach") {
+      setNavItems(coachNavItems);
+      console.log("coach")
+    }
+    else {
+      setNavItems(userNavItems)
+    }
+  }
+  useEffect(() => {
+    handleStateNavItems();
+  },[user?.id])
+  
   return (
     <>
       {/* Mobile Menu Button */}
@@ -84,7 +83,8 @@ const AppSidebar = () => {
         {/* Navigation */}
         <nav className="flex-1 px-3 mt-4 overflow-y-auto">
           <ul className="space-y-1">
-            {navItems.map((item) => {
+            
+            {navItems&&navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <li key={item.path}>

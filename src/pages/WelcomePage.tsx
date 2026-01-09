@@ -39,7 +39,7 @@ const WelcomePage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-hero relative overflow-hidden">
+    <div className="min-h-screen  bg-gradient-hero relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-pulse" />

@@ -23,7 +23,13 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@contexts/*": ["./src/contexts/*"],
+      "@components/*": ["./src/components/*"],
+      "@pages/*": ["./src/pages/*"],
+      "@coach/*": ["./src/coachPages/*"],
+      "@user/*": ["./src/userPages/*"],
+      "@types/*":["./src//types/*"]
     }
   },
   "include": ["src"]

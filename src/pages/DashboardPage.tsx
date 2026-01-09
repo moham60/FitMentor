@@ -30,6 +30,9 @@ interface Profile {
   goal: string | null;
 }
 
+
+
+
 const DashboardPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -502,5 +505,6 @@ const DashboardPage = () => {
     </MainLayout>
   );
 };
+
 
 export default DashboardPage;
