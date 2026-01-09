@@ -245,6 +245,7 @@ const OnboardingPage = () => {
         weight_kg: parsedWeight,
         activity_level: activityLevel,
         goal,
+        account_type: user.user_metadata?.account_type || 'user',
 
         // ✅ محسوبات السعرات
         bmr: plan.bmr,

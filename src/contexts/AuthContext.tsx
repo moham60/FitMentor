@@ -1,14 +1,17 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string, accountType: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string, fullName: string, accountType: "user" | "coach") => Promise<{ error: AuthError | null }>;
+  signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
+  updateUserMetadata: (metadata: Record<string, any>) => Promise<{ error: AuthError | null }>;
+  isNewUser: (userId: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,60 +22,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    // THEN check for existing session
+    // 1. جلب الجلسة الحالية عند تحميل الصفحة
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
+    // 2. الاستماع لأي تغيير في حالة تسجيل الدخول (تسجيل خروج، دخول، الخ)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
     return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data,error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    console.log("data", data);
-    console.log("err", error?.message);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
   };
 
-const signUp = async (
-  email: string,
-  password: string,
-  fullName: string,
-  accountType: "user" | "coach"
-) => {
-  return await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName,
-        account_type: accountType,
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName: string,
+    accountType: "user" | "coach"
+  ) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          account_type: accountType,
+        },
       },
-    },
-  });
-};
+    });
+    return { error };
+  };
 
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/`,
+      },
+    });
+    return { error: error as AuthError | null };
+  };
+
+  const updateUserMetadata = async (metadata: Record<string, any>) => {
+    const { error } = await supabase.auth.updateUser({
+      data: metadata,
+    });
+    return { error: error as AuthError | null };
+  };
+
+  const isNewUser = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error checking if user is new:', error);
+      return true; // Assume new if we can't check
+    }
+
+    return !data; // If no profile data exists, user is new
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signInWithGoogle, signOut, updateUserMetadata, isNewUser }}>
       {children}
     </AuthContext.Provider>
   );

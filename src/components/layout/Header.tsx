@@ -2,6 +2,8 @@ import { Sun, Moon, Bell } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface HeaderProps {
   title: string;
@@ -11,6 +13,31 @@ interface HeaderProps {
 const Header = ({ title, subtitle }: HeaderProps) => {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
+  const [dailyCalories, setDailyCalories] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchDailyCalories = async () => {
+      if (!user?.id) {
+        setDailyCalories(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('daily_calories')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching daily calories:', error);
+        setDailyCalories(null);
+      } else {
+        setDailyCalories(data?.daily_calories || null);
+      }
+    };
+
+    fetchDailyCalories();
+  }, [user?.id]);
 
   return (
     <header className="sticky top-0 z-40 bg-card border-b border-border px-6 py-4 lg:px-8">
@@ -29,7 +56,7 @@ const Header = ({ title, subtitle }: HeaderProps) => {
           <div className="hidden md:flex bg-gradient-primary text-primary-foreground px-4 py-2 rounded-xl text-center shadow-glow">
             <div>
               <p className="text-[10px] font-semibold uppercase opacity-90">Daily Goal</p>
-              <p className="text-xl font-bold">2,400</p>
+              <p className="text-xl font-bold">{dailyCalories ? dailyCalories.toLocaleString() : '—'}</p>
               <p className="text-[10px] opacity-90">calories</p>
             </div>
           </div>

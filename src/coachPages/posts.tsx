@@ -1,5 +1,6 @@
 import * as React from "react";
 import MainLayout from "@/components/layout/MainLayout";
+import { supabase } from "@/integrations/supabase/client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -19,21 +20,15 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { MdPostAdd } from "react-icons/md";
-import { FaHeart, FaRegHeart, FaRegCommentDots, FaShare } from "react-icons/fa";
+import { FaHeart, FaRegHeart, FaRegCommentDots } from "react-icons/fa";
 
 type CoachPost = {
   id: string;
+  user_id: string;
   coachName: string;
-  coachTitle?: string;
   coachAvatar?: string;
   createdAt: string;
   content: string;
@@ -45,54 +40,21 @@ type CoachPost = {
   visibility: "public" | "coaches";
 };
 
-const mockPosts: CoachPost[] = [
-  {
-    id: "p1",
-    coachName: "Sarah Elmasry",
-    coachTitle: "Strength Coach",
-    coachAvatar: "",
-    createdAt: "2h ago",
-    content:
-      "Quick tip: If your clients struggle with squats, start with tempo goblet squats for 2 weeks. The control builds confidence + patterning.",
-    imageUrl:
-      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1200&auto=format&fit=crop&q=60",
-    tags: ["strength", "squat", "coaching"],
-    likes: 128,
-    comments: 18,
-    likedByMe: true,
-    visibility: "coaches",
-  },
-  {
-    id: "p2",
-    coachName: "Omar Saad",
-    coachTitle: "Nutrition Coach",
-    coachAvatar: "",
-    createdAt: "Yesterday",
-    content:
-      "Client adherence hack: weekly “protein planning” call + a default shopping list reduces decision fatigue and improves compliance.",
-    tags: ["nutrition", "habits", "adherence"],
-    likes: 76,
-    comments: 9,
-    likedByMe: false,
-    visibility: "public",
-  },
-  {
-    id: "p3",
-    coachName: "Mona Adel",
-    coachTitle: "Mobility Specialist",
-    coachAvatar: "",
-    createdAt: "3 days ago",
-    content:
-      "For desk workers: 5-min daily thoracic opener routine. You’ll see better overhead position + less neck tension within 10 days.",
-    imageUrl:
-      "https://images.unsplash.com/photo-1599058917212-d750089bc07e?w=1200&auto=format&fit=crop&q=60",
-    tags: ["mobility", "posture"],
-    likes: 54,
-    comments: 7,
-    likedByMe: false,
-    visibility: "coaches",
-  },
-];
+type PostCommentItem = {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  user_full_name: string | null;
+  user_avatar_url: string | null;
+};
+
+type PostLikeItem = {
+  user_id: string;
+  user_full_name: string | null;
+  user_avatar_url: string | null;
+};
 
 function TagPills({ tags }: { tags: string[] }) {
   return (
@@ -115,13 +77,26 @@ function VisibilityBadge({ v }: { v: CoachPost["visibility"] }) {
 }
 
 export default function Posts() {
-  const [posts, setPosts] = React.useState<CoachPost[]>(mockPosts);
+  const [posts, setPosts] = React.useState<CoachPost[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
   const [tab, setTab] = React.useState<"all" | "coaches" | "public">("all");
   const [sort, setSort] = React.useState<"newest" | "popular">("newest");
   const [q, setQ] = React.useState("");
-  const [commentOpen, setCommentOpen] = React.useState(false);
-const [selectedPostId, setSelectedPostId] = React.useState<string | null>(null);
-const [commentText, setCommentText] = React.useState("");
+
+  // shared selected post
+  const [selectedPostId, setSelectedPostId] = React.useState<string | null>(null);
+
+  // comments dialog state
+  const [commentsOpen, setCommentsOpen] = React.useState(false);
+  const [commentsLoading, setCommentsLoading] = React.useState(false);
+  const [postComments, setPostComments] = React.useState<PostCommentItem[]>([]);
+  const [commentText, setCommentText] = React.useState("");
+
+  // likes dialog state
+  const [likesOpen, setLikesOpen] = React.useState(false);
+  const [likesLoading, setLikesLoading] = React.useState(false);
+  const [likesUsers, setLikesUsers] = React.useState<PostLikeItem[]>([]);
 
   // Create post dialog state
   const [open, setOpen] = React.useState(false);
@@ -130,14 +105,100 @@ const [commentText, setCommentText] = React.useState("");
   const [newTags, setNewTags] = React.useState("coaching, tips");
   const [newVisibility, setNewVisibility] = React.useState<CoachPost["visibility"]>("coaches");
 
+  const loadPosts = React.useCallback(async () => {
+    setLoading(true);
+
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes?.user?.id ?? null;
+
+    // 1) posts with author name from VIEW
+    const { data: postsData, error: postsErr } = await supabase
+      .from("posts_with_author")
+      .select("id,user_id,content,image_url,visibility,tags,created_at,author_full_name,author_avatar_url")
+      .order("created_at", { ascending: false });
+
+    if (postsErr) {
+      console.error("postsErr:", postsErr);
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
+
+    const rows = postsData ?? [];
+    if (!rows.length) {
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
+
+    // 2) comments count
+    const { data: commentsRows, error: commentsErr } = await supabase
+      .from("post_comments")
+      .select("post_id")
+      .in(
+        "post_id",
+        rows.map((p: any) => p.id)
+      );
+
+    if (commentsErr) console.warn("commentsErr:", commentsErr);
+
+    const commentsCount = new Map<string, number>();
+    for (const c of commentsRows ?? []) {
+      commentsCount.set((c as any).post_id, (commentsCount.get((c as any).post_id) ?? 0) + 1);
+    }
+
+    // 3) likes count + likedByMe
+    const { data: likesRows, error: likesErr } = await supabase
+      .from("post_likes")
+      .select("post_id,user_id")
+      .in(
+        "post_id",
+        rows.map((p: any) => p.id)
+      );
+
+    if (likesErr) console.warn("likesErr:", likesErr);
+
+    const likesCount = new Map<string, number>();
+    const likedByMeSet = new Set<string>();
+
+    for (const l of likesRows ?? []) {
+      likesCount.set((l as any).post_id, (likesCount.get((l as any).post_id) ?? 0) + 1);
+      if (uid && (l as any).user_id === uid) likedByMeSet.add((l as any).post_id);
+    }
+
+    const mapped: CoachPost[] = rows.map((p: any) => {
+      const visibility: CoachPost["visibility"] = p.visibility === "public" ? "public" : "coaches";
+
+      return {
+        id: p.id,
+        user_id: p.user_id,
+        coachName: p.author_full_name ?? "User",
+        coachAvatar: p.author_avatar_url ?? "",
+        createdAt: p.created_at ? new Date(p.created_at).toLocaleString() : "",
+        content: p.content ?? "",
+        imageUrl: p.image_url ?? undefined,
+        tags: Array.isArray(p.tags) ? p.tags : [],
+        likes: likesCount.get(p.id) ?? 0,
+        comments: commentsCount.get(p.id) ?? 0,
+        likedByMe: uid ? likedByMeSet.has(p.id) : false,
+        visibility,
+      };
+    });
+
+    setPosts(mapped);
+    setLoading(false);
+  }, []);
+
+  React.useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
+
   const filtered = React.useMemo(() => {
     let list = [...posts];
 
-    // Tabs filter
     if (tab === "coaches") list = list.filter((p) => p.visibility === "coaches");
     if (tab === "public") list = list.filter((p) => p.visibility === "public");
 
-    // Search
     const s = q.trim().toLowerCase();
     if (s) {
       list = list.filter(
@@ -148,34 +209,44 @@ const [commentText, setCommentText] = React.useState("");
       );
     }
 
-    // Sort
     if (sort === "popular") {
       list.sort((a, b) => b.likes + b.comments - (a.likes + a.comments));
-    } else {
-      // Mock newest: keep original order (you’ll sort by createdAt timestamp when real)
-      list = list;
     }
 
     return list;
   }, [posts, tab, sort, q]);
 
-  const toggleLike = (id: string) => {
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        const liked = !p.likedByMe;
-        return {
-          ...p,
-          likedByMe: liked,
-          likes: liked ? p.likes + 1 : Math.max(0, p.likes - 1),
-        };
-      })
-    );
+  const toggleLike = async (postId: string) => {
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes?.user?.id;
+    if (!uid) return;
+
+    const { data: existing, error: exErr } = await supabase
+      .from("post_likes")
+      .select("id")
+      .eq("post_id", postId)
+      .eq("user_id", uid)
+      .maybeSingle();
+
+    if (exErr) console.warn(exErr);
+
+    if ((existing as any)?.id) {
+      const { error } = await supabase.from("post_likes").delete().eq("id", (existing as any).id);
+      if (error) console.error(error);
+    } else {
+      const { error } = await supabase.from("post_likes").insert({ post_id: postId, user_id: uid } as any);
+      if (error) console.error(error);
+    }
+
+    await loadPosts();
   };
 
-  const submitPost = () => {
+  const submitPost = async () => {
     const content = newContent.trim();
     if (!content) return;
+
+    const { data: userRes, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !userRes?.user) return;
 
     const tags = newTags
       .split(",")
@@ -183,52 +254,96 @@ const [commentText, setCommentText] = React.useState("");
       .filter(Boolean)
       .slice(0, 8);
 
-    const post: CoachPost = {
-      id: `p_${Date.now()}`,
-      coachName: "You",
-      coachTitle: "Coach",
-      coachAvatar: "",
-      createdAt: "Just now",
+    const { error } = await supabase.from("posts").insert({
+      user_id: userRes.user.id,
       content,
-      imageUrl: newImage.trim() || undefined,
-      tags: tags.length ? tags : ["post"],
-      likes: 0,
-      comments: 0,
-      likedByMe: false,
+      image_url: newImage.trim() || null,
       visibility: newVisibility,
-    };
+      tags: tags.length ? tags : ["post"],
+    } as any);
 
-    setPosts((prev) => [post, ...prev]);
+    if (error) {
+      console.error(error);
+      return;
+    }
 
-    // reset
     setNewContent("");
     setNewImage("");
     setNewTags("coaching, tips");
     setNewVisibility("coaches");
     setOpen(false);
+
+    await loadPosts();
   };
-const openCommentModal = (postId: string) => {
-  setSelectedPostId(postId);
-  setCommentText("");
-  setCommentOpen(true);
-};
 
-const submitComment = () => {
-  const text = commentText.trim();
-  if (!text || !selectedPostId) return;
+  const openLikesModal = async (postId: string) => {
+    setSelectedPostId(postId);
+    setLikesOpen(true);
+    setLikesLoading(true);
+    setLikesUsers([]);
 
-  // UI only (mock): increase comments count
-  setPosts((prev) =>
-    prev.map((p) =>
-      p.id === selectedPostId ? { ...p, comments: p.comments + 1 } : p
-    )
-  );
+    const { data, error } = await supabase
+      .from("post_likes_with_user")
+      .select("user_id,user_full_name,user_avatar_url")
+      .eq("post_id", postId);
 
-  // هنا مكان ربط supabase insert لاحقًا
-  // await supabase.from("comments").insert({ post_id: selectedPostId, content: text })
+    if (error) {
+      console.error(error);
+      setLikesLoading(false);
+      return;
+    }
 
-  setCommentOpen(false);
-};
+    setLikesUsers((data ?? []) as any);
+    setLikesLoading(false);
+  };
+
+  const openCommentsModal = async (postId: string) => {
+    setSelectedPostId(postId);
+    setCommentsOpen(true);
+    setCommentsLoading(true);
+    setPostComments([]);
+    setCommentText("");
+
+    const { data, error } = await supabase
+      .from("post_comments_with_user")
+      .select("id,post_id,user_id,content,created_at,user_full_name,user_avatar_url")
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error(error);
+      setCommentsLoading(false);
+      return;
+    }
+
+    setPostComments((data ?? []) as any);
+    setCommentsLoading(false);
+  };
+
+  const submitComment = async () => {
+    const text = commentText.trim();
+    if (!text || !selectedPostId) return;
+
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes?.user?.id;
+    if (!uid) return;
+
+    const { error } = await supabase.from("post_comments").insert({
+      post_id: selectedPostId,
+      user_id: uid,
+      content: text,
+    } as any);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setCommentText("");
+
+    await openCommentsModal(selectedPostId);
+    await loadPosts();
+  };
 
   return (
     <MainLayout title="Posts">
@@ -242,7 +357,7 @@ const submitComment = () => {
             className="md:w-[360px]"
           />
 
-          <Select value={sort} onValueChange={(v) => setSort(v as any)}>
+          <Select value={sort} onValueChange={(v) => setSort(v as "newest" | "popular")}>
             <SelectTrigger className="md:w-[170px]">
               <SelectValue placeholder="Sort" />
             </SelectTrigger>
@@ -264,15 +379,13 @@ const submitComment = () => {
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>Create a new post</DialogTitle>
-              <DialogDescription>
-                Share tips, programs, or insights with other coaches.
-              </DialogDescription>
+              <DialogDescription>Share tips, programs, or insights with other coaches.</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Visibility</Label>
-                <Select value={newVisibility} onValueChange={(v) => setNewVisibility(v as any)}>
+                <Select value={newVisibility} onValueChange={(v) => setNewVisibility(v as CoachPost["visibility"])}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -291,18 +404,12 @@ const submitComment = () => {
                   placeholder="Write something valuable… (tips, routines, nutrition, mindset)"
                   className="min-h-[120px]"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Keep it clear and actionable. Short paragraphs work best.
-                </p>
+                <p className="text-xs text-muted-foreground">Keep it clear and actionable. Short paragraphs work best.</p>
               </div>
 
               <div className="space-y-2">
                 <Label>Image URL (optional)</Label>
-                <Input
-                  value={newImage}
-                  onChange={(e) => setNewImage(e.target.value)}
-                  placeholder="https://..."
-                />
+                <Input value={newImage} onChange={(e) => setNewImage(e.target.value)} placeholder="https://..." />
               </div>
 
               <div className="space-y-2">
@@ -330,138 +437,209 @@ const submitComment = () => {
       <Separator className="my-5" />
 
       {/* Tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "coaches" | "public")} className="w-full">
         <TabsList className="grid w-full grid-cols-3 md:w-[420px]">
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="coaches">Coaches</TabsTrigger>
           <TabsTrigger value="public">Public</TabsTrigger>
         </TabsList>
 
-        <TabsContent value={tab} className="mt-5">
+        <div className="mt-5">
           <div className="grid gap-4 lg:grid-cols-2">
-            {filtered.map((p) => (
-              <Card key={p.id} className="overflow-hidden">
-                <CardHeader className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={p.coachAvatar} />
-                        <AvatarFallback>
-                          {p.coachName
-                            .split(" ")
-                            .slice(0, 2)
-                            .map((x) => x[0])
-                            .join("")
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="leading-tight">
-                        <p className="font-semibold">{p.coachName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {p.coachTitle ? `${p.coachTitle} • ` : ""}
-                          {p.createdAt}
-                        </p>
-                      </div>
-                    </div>
-
-                    <VisibilityBadge v={p.visibility} />
-                  </div>
-
-                  <CardTitle className="text-base font-medium leading-relaxed">
-                    {p.content}
-                  </CardTitle>
-
-                  {p.tags?.length ? <TagPills tags={p.tags} /> : null}
-                </CardHeader>
-
-                {p.imageUrl ? (
-                  <div className="relative aspect-[16/9] w-full">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.imageUrl}
-                      alt="post"
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  </div>
-                ) : null}
-
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>{p.likes} likes</span>
-                    <span>{p.comments} comments</span>
-                  </div>
-                </CardContent>
-
-                <CardFooter className="flex items-center justify-between">
-                  <Button
-                    variant="secondary"
-                    className="gap-2"
-                    onClick={() => toggleLike(p.id)}
-                  >
-                    {p.likedByMe ? <FaHeart /> : <FaRegHeart />}
-                    Like
-                  </Button>
-
-                  <div className="flex items-center gap-2">
-                    <Button  onClick={() => openCommentModal(p.id)} variant="ghost" className="gap-2">
-                      <FaRegCommentDots />
-                      Comment
-                    </Button>
-                    <Button variant="ghost" className="gap-2">
-                      <FaShare />
-                      Share
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
-
-            {filtered.length === 0 ? (
+            {loading ? (
               <Card className="lg:col-span-2">
                 <CardContent className="py-10 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    No posts found. Try changing filters or search.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Loading posts…</p>
                 </CardContent>
               </Card>
-            ) : null}
+            ) : filtered.length === 0 ? (
+              <Card className="lg:col-span-2">
+                <CardContent className="py-10 text-center">
+                  <p className="text-sm text-muted-foreground">No posts yet.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              filtered.map((p) => (
+                <Card key={p.id} className="overflow-hidden">
+                  <CardHeader className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={p.coachAvatar} />
+                          <AvatarFallback>
+                            {(p.coachName ?? "U")
+                              .split(" ")
+                              .slice(0, 2)
+                              .map((x) => x[0]?.toUpperCase())
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div className="leading-tight">
+                          <p className="font-semibold">{p.coachName}</p>
+                          <p className="text-xs text-muted-foreground">{p.createdAt}</p>
+                        </div>
+                      </div>
+
+                      <VisibilityBadge v={p.visibility} />
+                    </div>
+
+                    <CardTitle className="text-base font-medium leading-relaxed">{p.content}</CardTitle>
+
+                    {p.tags?.length > 0 && <TagPills tags={p.tags} />}
+                  </CardHeader>
+
+                  {p.imageUrl && (
+                    <div className="relative aspect-[16/9] w-full">
+                      <img src={p.imageUrl} alt="post" className="h-full w-full object-cover" />
+                    </div>
+                  )}
+
+                  <CardFooter className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Button
+                        variant="link"
+                        className="h-auto p-0 text-sm text-muted-foreground"
+                        onClick={() => openLikesModal(p.id)}
+                      >
+                        {p.likes} likes
+                      </Button>
+
+                      <span>•</span>
+
+                      <Button
+                        variant="link"
+                        className="h-auto p-0 text-sm text-muted-foreground"
+                        onClick={() => openCommentsModal(p.id)}
+                      >
+                        {p.comments} comments
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => toggleLike(p.id)} className="gap-2">
+                        {p.likedByMe ? <FaHeart /> : <FaRegHeart />}
+                        Like
+                      </Button>
+
+                      <Button variant="secondary" size="sm" onClick={() => openCommentsModal(p.id)} className="gap-2">
+                        <FaRegCommentDots />
+                        Comment
+                      </Button>
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))
+            )}
           </div>
-        </TabsContent>
+        </div>
       </Tabs>
-    <Dialog open={commentOpen} onOpenChange={setCommentOpen}>
-    <DialogContent className="sm:max-w-lg">
-    <DialogHeader>
-      <DialogTitle>Add a comment</DialogTitle>
-      <DialogDescription>
-        Write a helpful comment for other coaches.
-      </DialogDescription>
-    </DialogHeader>
 
-    <div className="space-y-2">
-      <Label>Comment</Label>
-      <Textarea
-        value={commentText}
-        onChange={(e) => setCommentText(e.target.value)}
-        placeholder="Type your comment..."
-        className="min-h-[110px]"
-      />
-      <p className="text-xs text-muted-foreground">
-        Be respectful and keep it actionable.
-      </p>
-    </div>
+      {/* LIKES DIALOG */}
+      <Dialog open={likesOpen} onOpenChange={setLikesOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>People who liked</DialogTitle>
+            <DialogDescription>All users who liked this post.</DialogDescription>
+          </DialogHeader>
 
-    <DialogFooter className="gap-2 sm:gap-0">
-      <Button variant="secondary" onClick={() => setCommentOpen(false)}>
-        Cancel
-      </Button>
-      <Button onClick={submitComment} disabled={!commentText.trim()}>
-        Post comment
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+          <div className="space-y-3 max-h-[420px] overflow-auto">
+            {likesLoading ? (
+              <p className="text-sm text-muted-foreground">Loading likes...</p>
+            ) : likesUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No likes yet.</p>
+            ) : (
+              likesUsers.map((u) => (
+                <div key={u.user_id} className="flex items-center gap-3">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={u.user_avatar_url ?? ""} />
+                    <AvatarFallback>
+                      {(u.user_full_name ?? "U")
+                        .split(" ")
+                        .slice(0, 2)
+                        .map((x) => x[0]?.toUpperCase())
+                        .join("")}
+                    </AvatarFallback>
+                  </Avatar>
 
+                  <div className="leading-tight">
+                    <p className="text-sm font-medium">{u.user_full_name ?? "User"}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setLikesOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* COMMENTS DIALOG */}
+      <Dialog open={commentsOpen} onOpenChange={setCommentsOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Comments</DialogTitle>
+            <DialogDescription>See all comments and add yours.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 max-h-[320px] overflow-auto border rounded-md p-3">
+            {commentsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading comments...</p>
+            ) : postComments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No comments yet.</p>
+            ) : (
+              postComments.map((c) => (
+                <div key={c.id} className="flex gap-3">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={c.user_avatar_url ?? ""} />
+                    <AvatarFallback>
+                      {(c.user_full_name ?? "U")
+                        .split(" ")
+                        .slice(0, 2)
+                        .map((x) => x[0]?.toUpperCase())
+                        .join("")}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{c.user_full_name ?? "User"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{c.content}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Add a comment</Label>
+            <Textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Type your comment..."
+              className="min-h-[110px]"
+            />
+            <p className="text-xs text-muted-foreground">Be respectful and keep it actionable.</p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="secondary" onClick={() => setCommentsOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={submitComment} disabled={!commentText.trim()}>
+              Post comment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

@@ -1,13 +1,32 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, TrendingUp, Target, Sparkles, Activity, Star, Dumbbell, Flame, Heart, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import { Sun, Moon } from 'lucide-react';
 import heroWorkout from '@/assets/hero-workout.jpg';
 
 const WelcomePage = () => {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { signInWithGoogle } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        toast.error(error.message || 'Failed to connect to Google');
+      }
+    } catch (err) {
+      toast.error('Failed to connect to Google');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const features = [
     {
@@ -113,7 +132,12 @@ const WelcomePage = () => {
                     <path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
                 </Button>
-                <Button variant="outline" className="flex-1 h-12 rounded-xl hover:scale-105 transition-transform">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 h-12 rounded-xl hover:scale-105 transition-transform"
+                  onClick={handleGoogleSignIn}
+                  disabled={googleLoading}
+                >
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
                     <path fill="#EA4335" d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.27 0 3.198 2.698 1.24 6.65l4.026 3.115Z"/>
                     <path fill="#34A853" d="M16.04 18.013c-1.09.703-2.474 1.078-4.04 1.078a7.077 7.077 0 0 1-6.723-4.823l-4.04 3.067A11.965 11.965 0 0 0 12 24c2.933 0 5.735-1.043 7.834-3l-3.793-2.987Z"/>

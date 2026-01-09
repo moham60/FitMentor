@@ -32,7 +32,8 @@ const AppSidebar = () => {
     navigate('/');
   };
   const handleStateNavItems = () => {
-    if (user.user_metadata.account_type == "coach") {
+    const accountType = user?.user_metadata?.account_type || 'user';
+    if (accountType === 'coach') {
       setNavItems(coachNavItems);
       console.log("coach")
     }

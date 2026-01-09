@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Mail, Lock, Eye, EyeOff, Sun, Moon, Dumbbell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { toast } from 'sonner';
-import { Sun, Moon, Dumbbell } from 'lucide-react';
 import { z } from 'zod';
 
 const signInSchema = z.object({
@@ -18,7 +17,7 @@ const signInSchema = z.object({
 
 const SignInPage = () => {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   const { theme, toggleTheme } = useTheme();
   
   const [email, setEmail] = useState('');
@@ -28,11 +27,19 @@ const SignInPage = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const handleGoogleSignIn = async () => {
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) toast.error(error.message);
+    } catch (err) {
+      toast.error('Failed to connect to Google');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
 
-    // Validate
     const result = signInSchema.safeParse({ email, password });
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -67,7 +74,6 @@ const SignInPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
-      {/* Theme Toggle */}
       <button
         onClick={toggleTheme}
         className="fixed top-5 right-5 z-50 p-3 rounded-full bg-card border-2 border-border shadow-lg hover:scale-105 transition-transform"
@@ -77,7 +83,6 @@ const SignInPage = () => {
 
       <div className="w-full max-w-md">
         <div className="bg-card rounded-3xl p-8 lg:p-10 shadow-2xl animate-fade-in">
-          {/* Back Button */}
           <button
             onClick={() => navigate('/')}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
@@ -86,7 +91,6 @@ const SignInPage = () => {
             <span className="text-sm font-medium">Back</span>
           </button>
 
-          {/* Logo Icon */}
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center shadow-glow">
               <Dumbbell className="w-8 h-8 text-primary-foreground" />
@@ -101,7 +105,6 @@ const SignInPage = () => {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
             <div>
               <Label htmlFor="email" className="text-sm font-semibold">
                 Email Address
@@ -120,7 +123,6 @@ const SignInPage = () => {
               {errors.email && <p className="text-destructive text-xs mt-1">{errors.email}</p>}
             </div>
 
-            {/* Password */}
             <div>
               <Label htmlFor="password" className="text-sm font-semibold">
                 Password
@@ -146,7 +148,6 @@ const SignInPage = () => {
               {errors.password && <p className="text-destructive text-xs mt-1">{errors.password}</p>}
             </div>
 
-            {/* Remember & Forgot */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -183,7 +184,7 @@ const SignInPage = () => {
           </div>
 
           <div className="flex gap-4">
-            <Button variant="outline" className="flex-1 h-12 rounded-xl">
+            <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={handleGoogleSignIn}>
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.27 0 3.198 2.698 1.24 6.65l4.026 3.115Z"/>
                 <path fill="#34A853" d="M16.04 18.013c-1.09.703-2.474 1.078-4.04 1.078a7.077 7.077 0 0 1-6.723-4.823l-4.04 3.067A11.965 11.965 0 0 0 12 24c2.933 0 5.735-1.043 7.834-3l-3.793-2.987Z"/>

@@ -15,7 +15,7 @@
     "jsx": "react-jsx",
 
     /* Linting */
-    "strict": false,
+    "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitAny": false,
@@ -29,7 +29,7 @@
       "@pages/*": ["./src/pages/*"],
       "@coach/*": ["./src/coachPages/*"],
       "@user/*": ["./src/userPages/*"],
-      "@types/*":["./src//types/*"]
+      "@types/*":["./src/types/*"]
     }
   },
   "include": ["src"]
