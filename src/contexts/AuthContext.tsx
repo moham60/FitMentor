@@ -7,7 +7,12 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signUp: (email: string, password: string, fullName: string, accountType: "user" | "coach") => Promise<{ error: AuthError | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    accountType: "user" | "coach"
+  ) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   updateUserMetadata: (metadata: Record<string, any>) => Promise<{ error: AuthError | null }>;
@@ -22,21 +27,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. جلب الجلسة الحالية عند تحميل الصفحة
+    // 1) Get current session on load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    // 2. الاستماع لأي تغيير في حالة تسجيل الدخول (تسجيل خروج، دخول، الخ)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
+    // 2) Listen to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -52,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fullName: string,
     accountType: "user" | "coach"
   ) => {
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -62,39 +65,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       },
     });
+
     return { error };
   };
 
-  const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/`,
-      },
-    });
-    return { error: error as AuthError | null };
-  };
+  /**
+   * ✅ Google login should return to GoogleOnboardingPage first
+   * Important: you must add this URL in Supabase -> Auth -> URL Configuration -> Redirect URLs
+   * e.g. http://localhost:8080/google-onboarding
+   */
+const signInWithGoogle = async () => {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    },
+  });
+
+  return { error: error as AuthError | null };
+};
+
 
   const updateUserMetadata = async (metadata: Record<string, any>) => {
-    const { error } = await supabase.auth.updateUser({
-      data: metadata,
-    });
+    const { error } = await supabase.auth.updateUser({ data: metadata });
     return { error: error as AuthError | null };
   };
 
+  /**
+   * ✅ Better "new user" check:
+   * بعض المشاريع بتعمل profile تلقائي (trigger) => فـ data موجودة
+   * لكن full_name / account_type بيكونوا فاضيين => ده يعتبر "لسه جديد"
+   */
   const isNewUser = async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('user_id')
+      .select('user_id, full_name, account_type')
       .eq('user_id', userId)
       .maybeSingle();
 
     if (error) {
       console.error('Error checking if user is new:', error);
-      return true; // Assume new if we can't check
+      return true; // assume new if can't check
     }
 
-    return !data; // If no profile data exists, user is new
+    if (!data) return true;
+
+    const nameOk = typeof data.full_name === 'string' && data.full_name.trim().length > 0;
+    const typeOk = typeof data.account_type === 'string' && data.account_type.trim().length > 0;
+
+    return !(nameOk && typeOk);
   };
 
   const signOut = async () => {
@@ -102,7 +121,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signInWithGoogle, signOut, updateUserMetadata, isNewUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        signIn,
+        signUp,
+        signInWithGoogle,
+        signOut,
+        updateUserMetadata,
+        isNewUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
