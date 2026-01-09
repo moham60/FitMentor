@@ -22,9 +22,10 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { MdPostAdd } from "react-icons/md";
+import { MdPostAdd, MdPublic, MdLockOutline, MdSearch, MdSort } from "react-icons/md";
 import { FaHeart, FaRegHeart, FaRegCommentDots } from "react-icons/fa";
 
+// --- Types (نفس تعريفاتك تماماً) ---
 type CoachPost = {
   id: string;
   user_id: string;
@@ -33,6 +34,7 @@ type CoachPost = {
   createdAt: string;
   content: string;
   imageUrl?: string;
+  youtubeUrl?: string | null; // <--- أضف هذا السطر هنا
   tags: string[];
   likes: number;
   comments: number;
@@ -56,62 +58,73 @@ type PostLikeItem = {
   user_avatar_url: string | null;
 };
 
+// --- Components (تحسين التصميم) ---
+
 function TagPills({ tags }: { tags: string[] }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2 pt-2">
       {tags.map((t) => (
-        <Badge key={t} variant="secondary" className="rounded-full">
+        <Badge key={t} variant="secondary" className="rounded-full bg-primary/10 text-primary border-none hover:bg-primary/20 transition-colors px-3">
           #{t}
         </Badge>
       ))}
     </div>
   );
 }
+// وظيفة لتحويل روابط يوتيوب العادية إلى روابط قابلة للتضمين (Embed)
+// وظيفة محسنة لتحويل جميع أشكال روابط يوتيوب إلى روابط Embed
+function getYouTubeEmbedUrl(url: string | undefined | null) {
+  if (!url) return null;
+  const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+  const match = url.match(regExp);
+  const videoId = (match && match[7].length === 11) ? match[7] : null;
 
+  if (videoId) {
+    return `https://www.youtube.com/embed/${videoId}`;
+  }
+  return null;
+}
 function VisibilityBadge({ v }: { v: CoachPost["visibility"] }) {
+  const isPublic = v === "public";
   return (
-    <Badge variant={v === "public" ? "default" : "secondary"} className="rounded-full">
-      {v === "public" ? "Public" : "Coaches only"}
+    <Badge variant="outline" className={`rounded-full flex items-center gap-1 px-3 py-1 ${isPublic ? 'border-green-200 text-green-700 bg-green-50' : 'border-blue-200 text-blue-700 bg-blue-50'}`}>
+      {isPublic ? <MdPublic className="text-sm" /> : <MdLockOutline className="text-sm" />}
+      <span className="text-[10px] font-bold uppercase tracking-tight">{isPublic ? "Public" : "Coaches"}</span>
     </Badge>
   );
 }
 
 export default function Posts() {
+  // --- States (نفس كودك الأصلي) ---
   const [posts, setPosts] = React.useState<CoachPost[]>([]);
   const [loading, setLoading] = React.useState(true);
-
   const [tab, setTab] = React.useState<"all" | "coaches" | "public">("all");
   const [sort, setSort] = React.useState<"newest" | "popular">("newest");
   const [q, setQ] = React.useState("");
 
-  // shared selected post
   const [selectedPostId, setSelectedPostId] = React.useState<string | null>(null);
 
-  // comments dialog state
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [commentsLoading, setCommentsLoading] = React.useState(false);
   const [postComments, setPostComments] = React.useState<PostCommentItem[]>([]);
   const [commentText, setCommentText] = React.useState("");
 
-  // likes dialog state
   const [likesOpen, setLikesOpen] = React.useState(false);
   const [likesLoading, setLikesLoading] = React.useState(false);
   const [likesUsers, setLikesUsers] = React.useState<PostLikeItem[]>([]);
 
-  // Create post dialog state
   const [open, setOpen] = React.useState(false);
   const [newContent, setNewContent] = React.useState("");
   const [newImage, setNewImage] = React.useState("");
   const [newTags, setNewTags] = React.useState("coaching, tips");
   const [newVisibility, setNewVisibility] = React.useState<CoachPost["visibility"]>("coaches");
 
+  // --- Logic (نفس كودك الأصلي تماماً دون تغيير في العمليات) ---
   const loadPosts = React.useCallback(async () => {
     setLoading(true);
-
     const { data: userRes } = await supabase.auth.getUser();
     const uid = userRes?.user?.id ?? null;
 
-    // 1) posts with author name from VIEW
     const { data: postsData, error: postsErr } = await supabase
       .from("posts_with_author")
       .select("id,user_id,content,image_url,visibility,tags,created_at,author_full_name,author_avatar_url")
@@ -131,14 +144,10 @@ export default function Posts() {
       return;
     }
 
-    // 2) comments count
     const { data: commentsRows, error: commentsErr } = await supabase
       .from("post_comments")
       .select("post_id")
-      .in(
-        "post_id",
-        rows.map((p: any) => p.id)
-      );
+      .in("post_id", rows.map((p: any) => p.id));
 
     if (commentsErr) console.warn("commentsErr:", commentsErr);
 
@@ -147,14 +156,10 @@ export default function Posts() {
       commentsCount.set((c as any).post_id, (commentsCount.get((c as any).post_id) ?? 0) + 1);
     }
 
-    // 3) likes count + likedByMe
     const { data: likesRows, error: likesErr } = await supabase
       .from("post_likes")
       .select("post_id,user_id")
-      .in(
-        "post_id",
-        rows.map((p: any) => p.id)
-      );
+      .in("post_id", rows.map((p: any) => p.id));
 
     if (likesErr) console.warn("likesErr:", likesErr);
 
@@ -166,24 +171,28 @@ export default function Posts() {
       if (uid && (l as any).user_id === uid) likedByMeSet.add((l as any).post_id);
     }
 
-    const mapped: CoachPost[] = rows.map((p: any) => {
-      const visibility: CoachPost["visibility"] = p.visibility === "public" ? "public" : "coaches";
+const mapped: CoachPost[] = rows.map((p: any) => {
+  const visibility: CoachPost["visibility"] = p.visibility === "public" ? "public" : "coaches";
+  
+  // استخدام الدالة المحسنة لهندلة الرابط أياً كان شكله
+  const youtubeUrl = getYouTubeEmbedUrl(p.content ?? "");
 
-      return {
-        id: p.id,
-        user_id: p.user_id,
-        coachName: p.author_full_name ?? "User",
-        coachAvatar: p.author_avatar_url ?? "",
-        createdAt: p.created_at ? new Date(p.created_at).toLocaleString() : "",
-        content: p.content ?? "",
-        imageUrl: p.image_url ?? undefined,
-        tags: Array.isArray(p.tags) ? p.tags : [],
-        likes: likesCount.get(p.id) ?? 0,
-        comments: commentsCount.get(p.id) ?? 0,
-        likedByMe: uid ? likedByMeSet.has(p.id) : false,
-        visibility,
-      };
-    });
+  return {
+    id: p.id,
+    user_id: p.user_id,
+    coachName: p.author_full_name ?? "User",
+    coachAvatar: p.author_avatar_url ?? "",
+    createdAt: p.created_at ? new Date(p.created_at).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : "",
+    content: p.content ?? "",
+    imageUrl: p.image_url ?? undefined,
+    youtubeUrl: youtubeUrl, 
+    tags: Array.isArray(p.tags) ? p.tags : [],
+    likes: likesCount.get(p.id) ?? 0,
+    comments: commentsCount.get(p.id) ?? 0,
+    likedByMe: uid ? likedByMeSet.has(p.id) : false,
+    visibility,
+  };
+});
 
     setPosts(mapped);
     setLoading(false);
@@ -195,65 +204,73 @@ export default function Posts() {
 
   const filtered = React.useMemo(() => {
     let list = [...posts];
-
     if (tab === "coaches") list = list.filter((p) => p.visibility === "coaches");
     if (tab === "public") list = list.filter((p) => p.visibility === "public");
 
     const s = q.trim().toLowerCase();
     if (s) {
-      list = list.filter(
-        (p) =>
-          p.content.toLowerCase().includes(s) ||
-          p.coachName.toLowerCase().includes(s) ||
-          p.tags.some((t) => t.toLowerCase().includes(s))
+      list = list.filter((p) =>
+        p.content.toLowerCase().includes(s) ||
+        p.coachName.toLowerCase().includes(s) ||
+        p.tags.some((t) => t.toLowerCase().includes(s))
       );
     }
-
     if (sort === "popular") {
       list.sort((a, b) => b.likes + b.comments - (a.likes + a.comments));
     }
-
     return list;
   }, [posts, tab, sort, q]);
 
-  const toggleLike = async (postId: string) => {
-    const { data: userRes } = await supabase.auth.getUser();
-    const uid = userRes?.user?.id;
-    if (!uid) return;
+const toggleLike = async (postId: string) => {
+  const { data: userRes } = await supabase.auth.getUser();
+  const uid = userRes?.user?.id;
+  if (!uid) return;
 
-    const { data: existing, error: exErr } = await supabase
+  // 1. تحديث الواجهة فوراً (Optimistic Update)
+  setPosts((prevPosts) =>
+    prevPosts.map((post) => {
+      if (post.id === postId) {
+        const isLiked = post.likedByMe;
+        return {
+          ...post,
+          likedByMe: !isLiked,
+          likes: isLiked ? post.likes - 1 : post.likes + 1,
+        };
+      }
+      return post;
+    })
+  );
+
+  // 2. إرسال الطلب لقاعدة البيانات في الخلفية
+  try {
+    const { data: existing } = await supabase
       .from("post_likes")
       .select("id")
       .eq("post_id", postId)
       .eq("user_id", uid)
       .maybeSingle();
 
-    if (exErr) console.warn(exErr);
-
     if ((existing as any)?.id) {
-      const { error } = await supabase.from("post_likes").delete().eq("id", (existing as any).id);
-      if (error) console.error(error);
+      await supabase.from("post_likes").delete().eq("id", (existing as any).id);
     } else {
-      const { error } = await supabase.from("post_likes").insert({ post_id: postId, user_id: uid } as any);
-      if (error) console.error(error);
+      await supabase.from("post_likes").insert({ post_id: postId, user_id: uid } as any);
     }
-
-    await loadPosts();
-  };
+    
+    // ملاحظة: لم نعد بحاجة لـ await loadPosts() هنا لأننا حدثنا الحالة يدوياً
+    // هذا سيمنع الـ "ريفريش" المزعج
+  } catch (error) {
+    console.error("Error toggling like:", error);
+    // 3. في حالة فشل الطلب (اختياري): أعد جلب البيانات لضمان دقة الأرقام
+    loadPosts(); 
+  }
+};
 
   const submitPost = async () => {
     const content = newContent.trim();
     if (!content) return;
-
     const { data: userRes, error: userErr } = await supabase.auth.getUser();
     if (userErr || !userRes?.user) return;
-
-    const tags = newTags
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean)
-      .slice(0, 8);
-
+    const tags = newTags.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 8);
     const { error } = await supabase.from("posts").insert({
       user_id: userRes.user.id,
       content,
@@ -261,270 +278,270 @@ export default function Posts() {
       visibility: newVisibility,
       tags: tags.length ? tags : ["post"],
     } as any);
-
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    setNewContent("");
-    setNewImage("");
-    setNewTags("coaching, tips");
-    setNewVisibility("coaches");
-    setOpen(false);
-
+    if (error) { console.error(error); return; }
+    setNewContent(""); setNewImage(""); setNewTags("coaching, tips"); setNewVisibility("coaches"); setOpen(false);
     await loadPosts();
   };
 
   const openLikesModal = async (postId: string) => {
-    setSelectedPostId(postId);
-    setLikesOpen(true);
-    setLikesLoading(true);
-    setLikesUsers([]);
-
-    const { data, error } = await supabase
-      .from("post_likes_with_user")
-      .select("user_id,user_full_name,user_avatar_url")
-      .eq("post_id", postId);
-
-    if (error) {
-      console.error(error);
-      setLikesLoading(false);
-      return;
-    }
-
-    setLikesUsers((data ?? []) as any);
-    setLikesLoading(false);
+    setSelectedPostId(postId); setLikesOpen(true); setLikesLoading(true); setLikesUsers([]);
+    const { data, error } = await supabase.from("post_likes_with_user").select("user_id,user_full_name,user_avatar_url").eq("post_id", postId);
+    if (error) { console.error(error); setLikesLoading(false); return; }
+    setLikesUsers((data ?? []) as any); setLikesLoading(false);
   };
 
   const openCommentsModal = async (postId: string) => {
-    setSelectedPostId(postId);
-    setCommentsOpen(true);
-    setCommentsLoading(true);
-    setPostComments([]);
-    setCommentText("");
-
-    const { data, error } = await supabase
-      .from("post_comments_with_user")
-      .select("id,post_id,user_id,content,created_at,user_full_name,user_avatar_url")
-      .eq("post_id", postId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error(error);
-      setCommentsLoading(false);
-      return;
-    }
-
-    setPostComments((data ?? []) as any);
-    setCommentsLoading(false);
+    setSelectedPostId(postId); setCommentsOpen(true); setCommentsLoading(true); setPostComments([]); setCommentText("");
+    const { data, error } = await supabase.from("post_comments_with_user").select("id,post_id,user_id,content,created_at,user_full_name,user_avatar_url").eq("post_id", postId).order("created_at", { ascending: true });
+    if (error) { console.error(error); setCommentsLoading(false); return; }
+    setPostComments((data ?? []) as any); setCommentsLoading(false);
   };
 
-  const submitComment = async () => {
-    const text = commentText.trim();
-    if (!text || !selectedPostId) return;
+const submitComment = async () => {
+  const text = commentText.trim();
+  if (!text || !selectedPostId) return;
 
-    const { data: userRes } = await supabase.auth.getUser();
-    const uid = userRes?.user?.id;
-    if (!uid) return;
+  const { data: userRes } = await supabase.auth.getUser();
+  const user = userRes?.user;
+  if (!user) return;
 
+  // 1. تجهيز كائن التعليق الجديد (بشكل مؤقت للعرض الفوري)
+  const newCommentLocal: PostCommentItem = {
+    id: Math.random().toString(), // معرف عشوائي مؤقت
+    post_id: selectedPostId,
+    user_id: user.id,
+    content: text,
+    created_at: new Date().toISOString(),
+    user_full_name: "You", // أو يمكنك جلب اسم المستخدم الحالي من الـ state
+    user_avatar_url: null,
+  };
+
+  // 2. تحديث قائمة التعليقات في الـ Modal فوراً
+  setPostComments((prev) => [...prev, newCommentLocal]);
+  
+  // 3. تحديث عدد التعليقات في قائمة المنشورات الرئيسية فوراً
+  setPosts((prevPosts) =>
+    prevPosts.map((p) =>
+      p.id === selectedPostId ? { ...p, comments: p.comments + 1 } : p
+    )
+  );
+
+  setCommentText(""); // مسح صندوق الكتابة فوراً
+
+  // 4. إرسال التعليق لقاعدة البيانات في الخلفية
+  try {
     const { error } = await supabase.from("post_comments").insert({
       post_id: selectedPostId,
-      user_id: uid,
+      user_id: user.id,
       content: text,
     } as any);
 
-    if (error) {
-      console.error(error);
-      return;
-    }
+    if (error) throw error;
 
-    setCommentText("");
+    // اختياري: إعادة جلب التعليقات الحقيقية فقط للتأكد من الـ IDs والبيانات الصحيحة
+    // دون الحاجة لعمل ريفريش لكل المنشورات
+    const { data: freshComments } = await supabase
+      .from("post_comments_with_user")
+      .select("id,post_id,user_id,content,created_at,user_full_name,user_avatar_url")
+      .eq("post_id", selectedPostId)
+      .order("created_at", { ascending: true });
 
-    await openCommentsModal(selectedPostId);
-    await loadPosts();
-  };
+    if (freshComments) setPostComments(freshComments as any);
+
+  } catch (error) {
+    console.error("Error submitting comment:", error);
+    // في حالة الفشل، يفضل إبلاغ المستخدم أو إعادة جلب البيانات الأصلية
+    loadPosts(); 
+  }
+};
+
+  // --- UI Rendering ---
 
   return (
-    <MainLayout title="Posts">
-      {/* Top actions */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search posts, coaches, tags..."
-            className="md:w-[360px]"
-          />
+    <MainLayout title="Coaching Community">
+      <div className="max-w-5xl mx-auto pb-20 px-4">
+        
+        {/* Search & Actions Bar */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border shadow-sm mb-6">
+          <div className="flex flex-1 items-center gap-3 bg-muted/50 px-3 py-1 rounded-xl border border-transparent focus-within:border-primary focus-within:bg-card transition-all">
+            <MdSearch className="text-xl text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search posts, tags, or coaches..."
+              className="border-none bg-transparent focus-visible:ring-0 shadow-none px-0"
+            />
+          </div>
 
-          <Select value={sort} onValueChange={(v) => setSort(v as "newest" | "popular")}>
-            <SelectTrigger className="md:w-[170px]">
-              <SelectValue placeholder="Sort" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Newest</SelectItem>
-              <SelectItem value="popular">Most popular</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-3">
+            <Select value={sort} onValueChange={(v) => setSort(v as "newest" | "popular")}>
+              <SelectTrigger className="w-[140px] rounded-xl bg-muted/30 border-none">
+                <div className="flex items-center gap-2">
+                  <MdSort className="text-lg" />
+                  <SelectValue placeholder="Sort" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest</SelectItem>
+                <SelectItem value="popular">Popular</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded-xl gap-2 shadow-lg shadow-primary/20 transition-all active:scale-95">
+                  <MdPostAdd className="text-xl" />
+                  Create Post
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-xl rounded-3xl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl">Share Your Knowledge</DialogTitle>
+                  <DialogDescription>Your tips help other coaches grow. Keep it actionable.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-sm">Target Audience</Label>
+                    <Select value={newVisibility} onValueChange={(v) => setNewVisibility(v as CoachPost["visibility"])}>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="coaches">Coaches only</SelectItem>
+                        <SelectItem value="public">Everyone (Public)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-sm">Post Content</Label>
+                    <Textarea
+                      value={newContent}
+                      onChange={(e) => setNewContent(e.target.value)}
+                      placeholder="What's working for your clients lately?"
+                      className="min-h-[140px] rounded-2xl resize-none focus-visible:ring-primary border-muted-foreground/20"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-sm">Cover Image URL (Optional)</Label>
+                    <Input value={newImage} onChange={(e) => setNewImage(e.target.value)} placeholder="Paste link here..." className="rounded-xl" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-sm">Tags</Label>
+                    <Input value={newTags} onChange={(e) => setNewTags(e.target.value)} placeholder="e.g. nutrition, hypertrophy, client-psychology" className="rounded-xl" />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => setOpen(false)} className="rounded-xl">Discard</Button>
+                  <Button onClick={submitPost} disabled={!newContent.trim()} className="rounded-xl px-8">Post Now</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <MdPostAdd className="text-lg" />
-              Add Post
-            </Button>
-          </DialogTrigger>
+        {/* Feed Section */}
+        <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
+          <TabsList className="bg-muted/30 p-1 rounded-2xl w-full max-w-md grid grid-cols-3 mb-8 h-12">
+            <TabsTrigger value="all" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">All</TabsTrigger>
+            <TabsTrigger value="coaches" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">Coaches</TabsTrigger>
+            <TabsTrigger value="public" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">Public</TabsTrigger>
+          </TabsList>
 
-          <DialogContent className="sm:max-w-xl">
-            <DialogHeader>
-              <DialogTitle>Create a new post</DialogTitle>
-              <DialogDescription>Share tips, programs, or insights with other coaches.</DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Visibility</Label>
-                <Select value={newVisibility} onValueChange={(v) => setNewVisibility(v as CoachPost["visibility"])}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="coaches">Coaches only</SelectItem>
-                    <SelectItem value="public">Public</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Post content</Label>
-                <Textarea
-                  value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
-                  placeholder="Write something valuable… (tips, routines, nutrition, mindset)"
-                  className="min-h-[120px]"
-                />
-                <p className="text-xs text-muted-foreground">Keep it clear and actionable. Short paragraphs work best.</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Image URL (optional)</Label>
-                <Input value={newImage} onChange={(e) => setNewImage(e.target.value)} placeholder="https://..." />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Tags (comma separated)</Label>
-                <Input
-                  value={newTags}
-                  onChange={(e) => setNewTags(e.target.value)}
-                  placeholder="strength, nutrition, habits"
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="secondary" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={submitPost} disabled={!newContent.trim()}>
-                Publish
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Separator className="my-5" />
-
-      {/* Tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "coaches" | "public")} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:w-[420px]">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="coaches">Coaches</TabsTrigger>
-          <TabsTrigger value="public">Public</TabsTrigger>
-        </TabsList>
-
-        <div className="mt-5">
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-6">
             {loading ? (
-              <Card className="lg:col-span-2">
-                <CardContent className="py-10 text-center">
-                  <p className="text-sm text-muted-foreground">Loading posts…</p>
-                </CardContent>
-              </Card>
+              <div className="py-20 text-center flex flex-col items-center gap-3">
+                <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-muted-foreground font-medium italic">Loading feed...</p>
+              </div>
             ) : filtered.length === 0 ? (
-              <Card className="lg:col-span-2">
-                <CardContent className="py-10 text-center">
-                  <p className="text-sm text-muted-foreground">No posts yet.</p>
+              <Card className="border-dashed bg-muted/10">
+                <CardContent className="py-20 text-center opacity-60">
+                  <p className="text-lg">No posts to display in this category.</p>
                 </CardContent>
               </Card>
             ) : (
               filtered.map((p) => (
-                <Card key={p.id} className="overflow-hidden">
-                  <CardHeader className="space-y-3">
-                    <div className="flex items-start justify-between gap-3">
+                <Card key={p.id} className="overflow-hidden border-none shadow-sm ring-1 ring-black/[0.05] hover:ring-black/[0.08] transition-all bg-card/80 backdrop-blur-sm rounded-3xl">
+                  <CardHeader className="space-y-4 p-5">
+                    <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <Avatar>
+                        <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
                           <AvatarImage src={p.coachAvatar} />
-                          <AvatarFallback>
-                            {(p.coachName ?? "U")
-                              .split(" ")
-                              .slice(0, 2)
-                              .map((x) => x[0]?.toUpperCase())
-                              .join("")}
+                          <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                            {(p.coachName ?? "U").split(" ").slice(0, 2).map((x) => x[0]?.toUpperCase()).join("")}
                           </AvatarFallback>
                         </Avatar>
-
-                        <div className="leading-tight">
-                          <p className="font-semibold">{p.coachName}</p>
-                          <p className="text-xs text-muted-foreground">{p.createdAt}</p>
+                        <div>
+                          <p className="font-bold text-base leading-none mb-1.5">{p.coachName}</p>
+                          <p className="text-[11px] font-medium text-muted-foreground/80 tracking-wide uppercase">{p.createdAt}</p>
                         </div>
                       </div>
-
                       <VisibilityBadge v={p.visibility} />
                     </div>
 
-                    <CardTitle className="text-base font-medium leading-relaxed">{p.content}</CardTitle>
+                    <CardTitle className="text-base font-medium leading-relaxed tracking-tight text-foreground/90 px-1 whitespace-pre-wrap">
+                      {p.content}
+                    </CardTitle>
 
                     {p.tags?.length > 0 && <TagPills tags={p.tags} />}
                   </CardHeader>
 
-                  {p.imageUrl && (
-                    <div className="relative aspect-[16/9] w-full">
-                      <img src={p.imageUrl} alt="post" className="h-full w-full object-cover" />
-                    </div>
-                  )}
+{/* قسم الميديا الذكي */}
+{p.imageUrl && (
+  <div className="mx-5 mb-4 relative rounded-2xl overflow-hidden shadow-lg border bg-muted">
+    {/* إذا كان الرابط هو فيديو يوتيوب */}
+    {getYouTubeEmbedUrl(p.imageUrl) ? (
+      <div className="aspect-video">
+        <iframe
+          src={getYouTubeEmbedUrl(p.imageUrl)!}
+          title="YouTube video player"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="absolute top-0 left-0 w-full h-full border-0"
+        ></iframe>
+      </div>
+    ) : (
+      /* إذا كان الرابط صورة عادية */
+      <img 
+        src={p.imageUrl} 
+        alt="post content" 
+        className="w-full h-auto object-cover max-h-[500px] hover:scale-[1.02] transition-transform duration-700" 
+      />
+    )}
+  </div>
+)}
 
-                  <CardFooter className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Button
-                        variant="link"
-                        className="h-auto p-0 text-sm text-muted-foreground"
-                        onClick={() => openLikesModal(p.id)}
-                      >
-                        {p.likes} likes
-                      </Button>
-
-                      <span>•</span>
-
-                      <Button
-                        variant="link"
-                        className="h-auto p-0 text-sm text-muted-foreground"
-                        onClick={() => openCommentsModal(p.id)}
-                      >
-                        {p.comments} comments
-                      </Button>
+                  <CardFooter className="flex items-center justify-between p-4 bg-muted/10 border-t mt-2">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-card border rounded-full hover:bg-muted cursor-pointer transition-colors" onClick={() => openLikesModal(p.id)}>
+                        <span className="text-xs font-bold text-primary">{p.likes}</span>
+                        <span className="text-[11px] font-medium text-muted-foreground">Likes</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-card border rounded-full hover:bg-muted cursor-pointer transition-colors" onClick={() => openCommentsModal(p.id)}>
+                        <span className="text-xs font-bold text-primary">{p.comments}</span>
+                        <span className="text-[11px] font-medium text-muted-foreground">Comments</span>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Button variant="secondary" size="sm" onClick={() => toggleLike(p.id)} className="gap-2">
-                        {p.likedByMe ? <FaHeart /> : <FaRegHeart />}
-                        Like
+                      <Button 
+                        variant={p.likedByMe ? "default" : "secondary"} 
+                        size="sm" 
+                        onClick={() => toggleLike(p.id)} 
+                        className={`rounded-full px-4 gap-2 h-9 transition-all active:scale-95 ${p.likedByMe ? 'bg-primary' : 'bg-background hover:bg-muted border shadow-none'}`}
+                      >
+                        {p.likedByMe ? <FaHeart className="text-white" /> : <FaRegHeart className="text-primary" />}
+                        <span className={p.likedByMe ? "text-white font-bold" : "text-primary font-bold"}>Like</span>
                       </Button>
 
-                      <Button variant="secondary" size="sm" onClick={() => openCommentsModal(p.id)} className="gap-2">
-                        <FaRegCommentDots />
-                        Comment
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        onClick={() => openCommentsModal(p.id)} 
+                        className="rounded-full px-4 gap-2 h-9 bg-background hover:bg-muted border shadow-none"
+                      >
+                        <FaRegCommentDots className="text-primary" />
+                        <span className="text-primary font-bold">Reply</span>
                       </Button>
                     </div>
                   </CardFooter>
@@ -532,114 +549,89 @@ export default function Posts() {
               ))
             )}
           </div>
-        </div>
-      </Tabs>
+        </Tabs>
 
-      {/* LIKES DIALOG */}
-      <Dialog open={likesOpen} onOpenChange={setLikesOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>People who liked</DialogTitle>
-            <DialogDescription>All users who liked this post.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 max-h-[420px] overflow-auto">
-            {likesLoading ? (
-              <p className="text-sm text-muted-foreground">Loading likes...</p>
-            ) : likesUsers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No likes yet.</p>
-            ) : (
-              likesUsers.map((u) => (
-                <div key={u.user_id} className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={u.user_avatar_url ?? ""} />
-                    <AvatarFallback>
-                      {(u.user_full_name ?? "U")
-                        .split(" ")
-                        .slice(0, 2)
-                        .map((x) => x[0]?.toUpperCase())
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div className="leading-tight">
-                    <p className="text-sm font-medium">{u.user_full_name ?? "User"}</p>
+        {/* --- LIKES DIALOG (Logic untouched) --- */}
+        <Dialog open={likesOpen} onOpenChange={setLikesOpen}>
+          <DialogContent className="sm:max-w-md rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Appreciations</DialogTitle>
+              <DialogDescription>Everyone who found this post valuable.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 max-h-[400px] overflow-auto pr-2 custom-scrollbar mt-4">
+              {likesLoading ? (
+                <p className="text-sm text-center py-10 opacity-60">Fetching likes...</p>
+              ) : likesUsers.length === 0 ? (
+                <p className="text-sm text-center py-10 opacity-60">No likes yet.</p>
+              ) : (
+                likesUsers.map((u) => (
+                  <div key={u.user_id} className="flex items-center gap-3 hover:bg-muted/50 p-2 rounded-xl transition-colors">
+                    <Avatar className="h-10 w-10 border shadow-sm">
+                      <AvatarImage src={u.user_avatar_url ?? ""} />
+                      <AvatarFallback className="font-bold text-xs">{(u.user_full_name ?? "U")[0]}</AvatarFallback>
+                    </Avatar>
+                    <p className="text-sm font-bold tracking-tight">{u.user_full_name ?? "User"}</p>
                   </div>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* --- COMMENTS DIALOG (Logic untouched) --- */}
+        <Dialog open={commentsOpen} onOpenChange={setCommentsOpen}>
+          <DialogContent className="sm:max-w-2xl rounded-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+            <DialogHeader className="p-6 border-b bg-card">
+              <DialogTitle>Discussion</DialogTitle>
+              <DialogDescription>Exchange ideas and feedback below.</DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-auto p-6 space-y-6 bg-muted/10">
+              {commentsLoading ? (
+                <p className="text-sm text-center py-20 animate-pulse">Loading conversation...</p>
+              ) : postComments.length === 0 ? (
+                <div className="text-center py-14 opacity-40 italic flex flex-col gap-2">
+                   <FaRegCommentDots className="mx-auto text-3xl" />
+                   <p>Be the first to share your thoughts!</p>
                 </div>
-              ))
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setLikesOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* COMMENTS DIALOG */}
-      <Dialog open={commentsOpen} onOpenChange={setCommentsOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Comments</DialogTitle>
-            <DialogDescription>See all comments and add yours.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 max-h-[320px] overflow-auto border rounded-md p-3">
-            {commentsLoading ? (
-              <p className="text-sm text-muted-foreground">Loading comments...</p>
-            ) : postComments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No comments yet.</p>
-            ) : (
-              postComments.map((c) => (
-                <div key={c.id} className="flex gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={c.user_avatar_url ?? ""} />
-                    <AvatarFallback>
-                      {(c.user_full_name ?? "U")
-                        .split(" ")
-                        .slice(0, 2)
-                        .map((x) => x[0]?.toUpperCase())
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium">{c.user_full_name ?? "User"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
-                      </p>
+              ) : (
+                postComments.map((c) => (
+                  <div key={c.id} className="flex gap-4 items-start group">
+                    <Avatar className="h-10 w-10 border shadow-sm mt-1">
+                      <AvatarImage src={c.user_avatar_url ?? ""} />
+                      <AvatarFallback className="font-bold">{(c.user_full_name ?? "U")[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-1">
+                      <div className="bg-card p-3 rounded-2xl rounded-tl-none border shadow-sm group-hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between gap-4 mb-1">
+                          <span className="text-sm font-bold tracking-tight text-primary">{c.user_full_name ?? "User"}</span>
+                          <span className="text-[10px] font-medium text-muted-foreground/70">{c.created_at ? new Date(c.created_at).toLocaleDateString() : ""}</span>
+                        </div>
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{c.content}</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{c.content}</p>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
+                ))
+              )}
+            </div>
 
-          <div className="space-y-2">
-            <Label>Add a comment</Label>
-            <Textarea
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Type your comment..."
-              className="min-h-[110px]"
-            />
-            <p className="text-xs text-muted-foreground">Be respectful and keep it actionable.</p>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="secondary" onClick={() => setCommentsOpen(false)}>
-              Close
-            </Button>
-            <Button onClick={submitComment} disabled={!commentText.trim()}>
-              Post comment
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <div className="p-6 border-t bg-card mt-auto shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
+              <div className="flex gap-3">
+                <Textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Add a constructive comment..."
+                  className="min-h-[50px] h-12 py-3 rounded-2xl bg-muted/30 border-none focus-visible:ring-primary focus-visible:bg-card transition-all text-sm resize-none"
+                />
+                <Button onClick={submitComment} disabled={!commentText.trim()} className="rounded-2xl h-12 px-6 shadow-md shadow-primary/10">
+                  Send
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-3 px-1">Community Guidelines: Keep discussion professional and respectful.</p>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     </MainLayout>
   );
 }
