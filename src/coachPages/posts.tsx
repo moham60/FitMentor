@@ -422,7 +422,7 @@ const submitComment = async () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-semibold text-sm">Cover Image URL (Optional)</Label>
+                    <Label className="font-semibold text-sm">Image OR YoutubeURl</Label>
                     <Input value={newImage} onChange={(e) => setNewImage(e.target.value)} placeholder="Paste link here..." className="rounded-xl" />
                   </div>
                   <div className="space-y-2">
