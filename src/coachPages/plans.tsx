@@ -9,9 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { cn } from "@/lib/utils";
 import { BackMuscleMap } from "@/components/workout/BackMuscleMap";
 import { FemaleMuscleMap } from "@/components/workout/FemaleMuscleMap";
+import { Textarea } from "@/components/ui/textarea";
 const createId = () => crypto.randomUUID();
 
 const NAMES_AR: Record<string, string> = {
@@ -47,6 +47,7 @@ type TrainingPlan = {
   name: string;
   type: "basic" | "gold" | "premium";
   muscles: PlanMuscle[];
+  description:string,
 };
 
 export default function Plan() {
@@ -54,8 +55,9 @@ export default function Plan() {
     name: "",
     type: "gold",
     muscles: [],
+    description:""
   });
-
+  
   const [viewMode, setViewMode] = useState<"front" | "back">("front");
   const [isMale, setIsMale] = useState(true);
   const [nameError, setNameError] = useState("");
@@ -148,8 +150,9 @@ setPlan((prev) => ({
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
-                <Label>Plan Name*</Label>
+                <Label htmlFor="name">Plan Name*</Label>
                 <Input
+                id="name"
                   value={plan.name}
                   onChange={(e) => {
                     setPlan((p) => ({ ...p, name: e.target.value }));
@@ -162,7 +165,24 @@ setPlan((prev) => ({
                   <p className="text-sm text-red-500 mt-1">{nameError}</p>
                 )}
               </div>
-
+        {/**plan description inpt */}
+              <div>
+<Label htmlFor="description">Plan Description*</Label>
+                <Textarea  id="description"
+                  value={plan.description}
+                  rows={4}
+                  cols={4}
+                  onChange={(e) => {
+                    setPlan((p) => ({ ...p, description: e.target.value }));
+                    setNameError("");
+                  }}
+                  placeholder="e.g., Full Body 4-Day Program"
+                  className={nameError ? "border-red-500" : ""}/>
+                {nameError && (
+                  <p className="text-sm text-red-500 mt-1">{nameError}</p>
+                )}
+              </div>
+              {/**plan type inpt */}
               <div>
                 <Label>Plan Type</Label>
                 <Select
