@@ -1,21 +1,21 @@
-// src/pages/Plan.tsx
 import { useState, useEffect, useMemo } from "react";
-import { toast } from "sonner"; // أو أي مكتبة toast تستخدمها
+import { toast } from "sonner"; 
+import { FilePlus, Dumbbell } from "lucide-react"; // أيقونات مقترحة
 
 import MainLayout from "@/components/layout/MainLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { cn } from "@/lib/utils";
 import { BackMuscleMap } from "@/components/workout/BackMuscleMap";
 import { FemaleMuscleMap } from "@/components/workout/FemaleMuscleMap";
+
 const createId = () => crypto.randomUUID();
 
 const NAMES_AR: Record<string, string> = {
-    calves: "Calves",
+  calves: "Calves",
   quads: "Quadriceps",
   abdominals: "Abs",
   obliques: "Obliques",
@@ -50,6 +50,14 @@ type TrainingPlan = {
 };
 
 export default function Plan() {
+  // 1. محاكاة لجلب البيانات (هل المستخدم لديه خطة؟)
+  // في التطبيق الحقيقي، ستكون هذه القيمة قادمة من الـ Database أو API
+  const [hasPlan, setHasPlan] = useState(false); 
+  
+  // 2. حالة للتحكم في ظهور واجهة إنشاء الخطة
+  const [showCreator, setShowCreator] = useState(false);
+
+  // --- States الخاصة بإنشاء الخطة (الكود القديم) ---
   const [plan, setPlan] = useState<TrainingPlan>({
     name: "",
     type: "gold",
@@ -60,6 +68,7 @@ export default function Plan() {
   const [isMale, setIsMale] = useState(true);
   const [nameError, setNameError] = useState("");
 
+  // --- دوال التحكم في العضلات (الكود القديم) ---
   const addMuscle = (muscleId: string) => {
     if (plan.muscles.some((m) => m.muscleId === muscleId)) {
       toast.warning("The muscle is already in the plan.");
@@ -68,21 +77,21 @@ export default function Plan() {
 
     const name = NAMES_AR[muscleId] || muscleId;
 
-setPlan((prev) => ({
-  ...prev,
-  muscles: [
-    ...prev.muscles,
-    {
-      id: createId(),       
-      muscleId,
-      muscleName: name,
-      exerciseCount: 3,
-      sets: 4,
-      reps: "8-12",
-      order: prev.muscles.length,
-    },
-  ],
-}));
+    setPlan((prev) => ({
+      ...prev,
+      muscles: [
+        ...prev.muscles,
+        {
+          id: createId(),       
+          muscleId,
+          muscleName: name,
+          exerciseCount: 3,
+          sets: 4,
+          reps: "8-12",
+          order: prev.muscles.length,
+        },
+      ],
+    }));
 
     toast.success(`Added ${name}`);
   };
@@ -131,13 +140,80 @@ setPlan((prev) => ({
       }
     }
 
+    // محاكاة الحفظ
     toast.success("Training plan saved successfully!");
     console.log("Saved plan:", plan);
-    // Here you put the API code if you want
+    setHasPlan(true); // بعد الحفظ، نعتبر أن لديه خطة
+    setShowCreator(false); // نغلق واجهة الإنشاء (اختياري)
   };
 
+  // ------------------------------------------------------------------
+  // السيناريو الأول: المستخدم ليس لديه خطة ولم يضغط على زر الإنشاء بعد
+  // ------------------------------------------------------------------
+  if (!hasPlan && !showCreator) {
+    return (
+      <MainLayout title="My Plan" subtitle="Manage your training">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
+          <Card className="w-full max-w-md text-center border-dashed border-2 shadow-none bg-muted/30">
+            <CardHeader className="space-y-4 pb-2">
+              <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit">
+                <Dumbbell className="w-10 h-10 text-primary" />
+              </div>
+              <CardTitle className="text-2xl">You don't have a plan</CardTitle>
+              <CardDescription>
+                Start your journey by creating a custom workout plan tailored to your needs.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <Button 
+                size="lg" 
+                className="w-full gap-2"
+                onClick={() => setShowCreator(true)}
+              >
+                <FilePlus className="w-4 h-4" />
+                Create New Plan
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // السيناريو الثاني: المستخدم لديه خطة (عرض الخطة)
+  // ------------------------------------------------------------------
+  if (hasPlan && !showCreator) {
+     return (
+        <MainLayout title="My Current Plan" subtitle="Track your progress">
+            <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+                <Card className="w-full max-w-lg">
+                    <CardHeader>
+                        <CardTitle>Your Active Plan</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-muted-foreground mb-4">You have an active plan saved.</p>
+                        <Button variant="outline" onClick={() => setShowCreator(true)}>Edit / Create New</Button>
+                    </CardContent>
+                </Card>
+            </div>
+        </MainLayout>
+     )
+  }
+
+  // ------------------------------------------------------------------
+  // السيناريو الثالث: وضع الإنشاء (showCreator === true)
+  // يتم عرض الكود الأصلي الخاص بك هنا
+  // ------------------------------------------------------------------
   return (
     <MainLayout title="Create Training Plan" subtitle="Build Custom Programs">
+        {/* زر للعودة للخلف إذا أراد المستخدم إلغاء الإنشاء */}
+        {!hasPlan && (
+            <div className="mb-4">
+                 <Button variant="ghost" size="sm" onClick={() => setShowCreator(false)}>← Back</Button>
+            </div>
+        )}
+
       <div className="grid lg:grid-cols-12 gap-6 pb-24">
         {/* Left Side - Controls + Table */}
         <div className="lg:col-span-5 space-y-6">
@@ -148,7 +224,7 @@ setPlan((prev) => ({
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
-                <Label>Plan Name*</Label>
+                <Label>Plan Name</Label>
                 <Input
                   value={plan.name}
                   onChange={(e) => {
@@ -272,12 +348,11 @@ setPlan((prev) => ({
           </Card>
         </div>
 
-        {/* الجزء الأيمن - خريطة الجسم */}
         <div className="lg:col-span-7">
           <Card className="overflow-hidden">
             <CardHeader className="pb-2">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <CardTitle>اختر العضلات</CardTitle>
+                <CardTitle>Choose Muscle</CardTitle>
 
                 <div className="flex items-center gap-3">
                   <ToggleGroup
@@ -300,36 +375,35 @@ setPlan((prev) => ({
               </div>
             </CardHeader>
 
-<CardContent className="p-3">
-  {isMale ? (
-    viewMode === "front" ? (
-      <div className="w-full rounded-xl border bg-muted/10 p-3 overflow-auto">
-        <style>{`
-          .muscleSvg g.bodymap { 
-            color: hsl(var(--muted-foreground)); 
-            cursor: pointer; 
-            transition: all .12s ease; 
-          }
-          .muscleSvg g.bodymap:hover { 
-            color: hsl(var(--foreground)); 
-            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1)); 
-          }
-          /* تمييز العضلات المختارة بالفعل في الجدول */
-          .muscleSvg g.bodymap.is-selected { 
-            color: hsl(var(--primary)); 
-          }
-        `}</style>
-        <svg
-          className="muscleSvg w-full max-w-[400px] mx-auto h-auto"
-          viewBox="0 0 660.46 1206.46"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          onClick={(e) => {
-            const g = (e.target as Element).closest("g.bodymap");
-            if (g?.id) addMuscle(g.id);
-          }}
-        >
-          {/* محتوى الـ SVG الأمامي للذكر كاملاً */}
+            <CardContent className="p-3">
+              {isMale ? (
+                viewMode === "front" ? (
+                  <div className="w-full rounded-xl border bg-muted/10 p-3 overflow-auto">
+                    <style>{`
+                      .muscleSvg g.bodymap { 
+                        color: hsl(var(--muted-foreground)); 
+                        cursor: pointer; 
+                        transition: all .12s ease; 
+                      }
+                      .muscleSvg g.bodymap:hover { 
+                        color: hsl(var(--foreground)); 
+                        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1)); 
+                      }
+                      .muscleSvg g.bodymap.is-selected { 
+                        color: hsl(var(--primary)); 
+                      }
+                    `}</style>
+                    <svg
+                      className="muscleSvg w-full max-w-[400px] mx-auto h-auto"
+                      viewBox="0 0 660.46 1206.46"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      onClick={(e) => {
+                        const g = (e.target as Element).closest("g.bodymap");
+                        if (g?.id) addMuscle(g.id);
+                      }}
+                    >
+{/* محتوى الـ SVG الأمامي للذكر كاملاً */}
                 <g id="calves" className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100">
                   <path d="M502.8,1183.5c-.68,1.05-1.86,1.29-2.74,1.31-.93.02-1.69.81-1.69,1.77,0,.38-.14,1.54-.78,2.18-.39.38-.97.56-1.75.53-.8-.04-1.51.52-1.72,1.32,0,.03-.6,2.33-2.27,3.3-.86.51-1.88.59-3.12.24-.69-.19-1.44.07-1.86.67-.02.03-1.86,2.61-4.39,2.9-1.39.17-2.76-.38-4.19-1.68-.68-.62-1.71-.58-2.35.08-.04.04-4.49,4.53-10.15,3.77-4.52-.61-8.73-4.34-12.51-11.09-.21-.39-.58-.69-1.02-.81-.57-.17-14.2-4.29-13.15-17.37.18-5.53-4.76-8.41-11.01-12.05l-.97-.57c-5.92-3.45-9.83-5.73-6.12-27.69.89-7.14-.42-14.69-.48-15-.11-.62-.33-1.05-.9-1.25-.42-.36-3.52-3.52-2.29-17.55,1.51-17.34,2.94-33.72-17.75-101.36-1.11-3.85-2.68-6.08-4.18-8.24-4.08-5.83-8.31-11.86-2.32-56.42,2.35-21.34,3.14-29.8,2.5-34.69,6.67,6.59,14.23,10.26,21.63,10.26h.34c8.38-.13,15.5-4.85,20.06-13.29,4.38-8.1,7.01-11.48,12.38-13.17.31.97.72 2.16 1.23 3.63,5.67 16.3 20.73 59.59 8.3 131.92,0 .05 0 .1-.02.15-.7 7.93-1.67 16.17-2.6 24.14-2.43 20.85-4.73 40.55-2.42 53.28,1.72 10.5 2.43 14.98 2.6 20.5,0 .15.03.3.07.45,1.34 4.55 8.23 15.73 12.79 23.12,1.33 2.14 2.46 4 3.13 5.14.8 1.37 1.22 2.38 1.59 3.25,1.09 2.59 1.89 4.14 6.89 8.26.9.74 1.83 1.49 2.8 2.26,6.46 5.2 13.78 11.1 17.75 20.07,1.41 3.47 1.65 6.21.69 7.71Z" fill="currentColor"></path>
                   <path d="M265.06,986.92c-1.51,2.16-3.08,4.4-4.18,8.22-20.71,67.67-19.28,84.05-17.76,101.38,1.22,14.03-1.87,17.2-2.29,17.55-.56.2-.79.63-.9,1.25-.05.31-1.37,7.86-.47,15.08,3.7,21.87-.21,24.15-6.13,27.61l-.98.57c-6.25,3.64-11.18,6.51-10.99,12.13,1.04,12.99-12.58,17.12-13.16,17.28-.44.12-.8.42-1.02.81-3.78,6.75-7.99,10.47-12.51,11.09-5.67.76-10.1-3.72-10.15-3.77-.63-.66-1.67-.7-2.35-.08-1.42,1.29-2.8,1.84-4.18,1.68-2.53-.29-4.39-2.88-4.41-2.9-.42-.6-1.15-.87-1.85-.67-1.25.35-2.28.27-3.13-.24-1.67-.98-2.27-3.28-2.27-3.3-.2-.8-.91-1.36-1.72-1.33-.79.03-1.36-.15-1.75-.53-.64-.64-.78-1.79-.78-2.17,0-.96-.74-1.76-1.68-1.77-.88-.02-2.07-.26-2.75-1.31-.96-1.5-.72-4.24.67-7.66,4-9.02,11.31-14.92,17.78-20.12.96-.77,1.89-1.52,2.79-2.26,5-4.13,5.8-5.67,6.89-8.26.37-.88.79-1.88,1.59-3.25.67-1.15,1.81-2.99,3.12-5.13,4.56-7.4,11.46-18.58,12.8-23.13.04-.15.07-.3.07-.45.17-5.52.88-10,2.6-20.47,2.31-12.77,0-32.47-2.42-53.32-.93-7.96-1.9-16.21-2.6-24.14,0-.05,0-.1-.02-.15-12.43-72.33,2.63-115.62,8.3-131.92.51-1.47.92-2.66,1.23-3.63,5.38,1.69,8,5.06,12.39,13.17,4.55,8.44,11.67,13.16,20.05,13.29h.35c7.39,0,14.95-3.67,21.62-10.27-.64,4.9.15,13.37,2.5,34.74,5.99,44.51,1.77,50.55-2.31,56.38Z" fill="currentColor"></path>
@@ -409,25 +483,25 @@ setPlan((prev) => ({
                   <ellipse cx="221.14" cy="1105.65" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
                 </g>
         </svg>
-      </div>
-    ) : (
-      <BackMuscleMap
-        selected={undefined}
-        onMuscleClick={addMuscle}
-        dimmed={false}
-      />
-    )
-  ) : (
-    <div className="w-full rounded-xl border bg-muted/10 p-3 overflow-auto">
-      <FemaleMuscleMap
-        view={viewMode}
-        selected={undefined}
-        onMuscleClick={addMuscle}
-        dimmed={false}
-      />
-    </div>
-  )}
-</CardContent>
+                  </div>
+                ) : (
+                  <BackMuscleMap
+                    selected={undefined}
+                    onMuscleClick={addMuscle}
+                    dimmed={false}
+                  />
+                )
+              ) : (
+                <div className="w-full rounded-xl border bg-muted/10 p-3 overflow-auto">
+                  <FemaleMuscleMap
+                    view={viewMode}
+                    selected={undefined}
+                    onMuscleClick={addMuscle}
+                    dimmed={false}
+                  />
+                </div>
+              )}
+            </CardContent>
           </Card>
         </div>
       </div>
