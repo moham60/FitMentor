@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner"; 
-import { FilePlus, Dumbbell } from "lucide-react"; // أيقونات مقترحة
-
+import { FilePlus, Dumbbell, Trash2, LayoutList, ArrowLeft } from "lucide-react"; 
 import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,95 +14,58 @@ import { FemaleMuscleMap } from "@/components/workout/FemaleMuscleMap";
 const createId = () => crypto.randomUUID();
 
 const NAMES_AR: Record<string, string> = {
-  calves: "Calves",
-  quads: "Quadriceps",
-  abdominals: "Abs",
-  obliques: "Obliques",
-  hands: "Hands",
-  forearms: "Forearms",
-  biceps: "Biceps",
-  "front-shoulders": "Front Shoulders", 
-  chest: "Chest",
-  traps: "Trapezius",
-  hamstrings: "Hamstrings",
-  glutes: "Glutes",
-  lats: "Lats", 
-  lowerback: "Lower Back",
-  "rear-shoulders": "Rear Shoulders", 
-  triceps: "Triceps",
+  calves: "Calves", quads: "Quadriceps", abdominals: "Abs", obliques: "Obliques",
+  hands: "Hands", forearms: "Forearms", biceps: "Biceps", "front-shoulders": "Front Shoulders",
+  chest: "Chest", traps: "Trapezius", hamstrings: "Hamstrings", glutes: "Glutes",
+  lats: "Lats", lowerback: "Lower Back", "rear-shoulders": "Rear Shoulders", triceps: "Triceps",
 };
 
 type PlanMuscle = {
-  id: string;
-  muscleId: string;
-  muscleName: string;
-  exerciseCount: number;
-  sets: number;
-  reps: string;
-  order: number;
+  id: string; muscleId: string; muscleName: string; exerciseCount: number;
+  sets: number; reps: string; order: number;
 };
 
 type TrainingPlan = {
-  name: string;
-  type: "basic" | "gold" | "premium";
-  muscles: PlanMuscle[];
+  name: string; type: "basic" | "gold" | "premium"; muscles: PlanMuscle[];
 };
 
 export default function Plan() {
-
-  const [hasPlan, setHasPlan] = useState(false); 
+  // --- States ---
+  const [plans, setPlans] = useState<TrainingPlan[]>([]); 
   const [showCreator, setShowCreator] = useState(false);
-  const [plan, setPlan] = useState<TrainingPlan>({
-    name: "",
-    type: "gold",
-    muscles: [],
-  });
-
+  const [plan, setPlan] = useState<TrainingPlan>({ name: "", type: "gold", muscles: [] });
   const [viewMode, setViewMode] = useState<"front" | "back">("front");
   const [isMale, setIsMale] = useState(true);
   const [nameError, setNameError] = useState("");
+
+  // --- Actions ---
   const addMuscle = (muscleId: string) => {
     if (plan.muscles.some((m) => m.muscleId === muscleId)) {
       toast.warning("The muscle is already in the plan.");
       return;
     }
-
     const name = NAMES_AR[muscleId] || muscleId;
-
     setPlan((prev) => ({
       ...prev,
-      muscles: [
-        ...prev.muscles,
-        {
-          id: createId(),       
-          muscleId,
-          muscleName: name,
-          exerciseCount: 3,
-          sets: 4,
-          reps: "8-12",
-          order: prev.muscles.length,
-        },
-      ],
+      muscles: [...prev.muscles, {
+        id: createId(), muscleId, muscleName: name, exerciseCount: 3,
+        sets: 4, reps: "8-12", order: prev.muscles.length,
+      }],
     }));
-
     toast.success(`Added ${name}`);
   };
 
   const updateMuscle = (id: string, field: keyof PlanMuscle, value: any) => {
     setPlan((prev) => ({
       ...prev,
-      muscles: prev.muscles.map((m) =>
-        m.id === id ? { ...m, [field]: value } : m
-      ),
+      muscles: prev.muscles.map((m) => m.id === id ? { ...m, [field]: value } : m),
     }));
   };
 
   const removeMuscle = (id: string) => {
     setPlan((prev) => ({
       ...prev,
-      muscles: prev.muscles
-        .filter((m) => m.id !== id)
-        .map((m, idx) => ({ ...m, order: idx })),
+      muscles: prev.muscles.filter((m) => m.id !== id).map((m, idx) => ({ ...m, order: idx })),
     }));
   };
 
@@ -111,59 +73,40 @@ export default function Plan() {
     const totalMuscles = plan.muscles.length;
     const totalExercises = plan.muscles.reduce((sum, m) => sum + m.exerciseCount, 0);
     const totalSets = plan.muscles.reduce((sum, m) => sum + m.sets * m.exerciseCount, 0);
-
     return { totalMuscles, totalExercises, totalSets };
   }, [plan.muscles]);
 
   const handleSave = () => {
     if (!plan.name.trim()) {
       setNameError("Plan name is required");
-      toast.error("Plan name is required");
       return;
     }
-
     if (plan.muscles.length === 0) {
-      toast.error("At least one muscle must be selected.");
+      toast.error("Select at least one muscle.");
       return;
     }
-
-    if (totals.totalSets > 100) {
-      if (!confirm("Total sets are high (>100). Do you want to continue?")) {
-        return;
-      }
-    }
-
-    toast.success("Training plan saved successfully!");
-    console.log("Saved plan:", plan);
-    setHasPlan(true); 
+    setPlans((prev) => [...prev, plan]);
+    setPlan({ name: "", type: "gold", muscles: [] }); // Reset form
     setShowCreator(false);
+    toast.success("Plan saved!");
   };
 
-  // ------------------------------------------------------------------
-  // السيناريو الأول: المستخدم ليس لديه خطة ولم يضغط على زر الإنشاء بعد
-  // ------------------------------------------------------------------
-  if (!hasPlan && !showCreator) {
+  // 1. شاشة فارغة (لا توجد خطط)
+  if (plans.length === 0 && !showCreator) {
     return (
-      <MainLayout title="My Plan" subtitle="Manage your training">
+      <MainLayout title="My Plans" subtitle="Build your fitness routine">
         <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
-          <Card className="w-full max-w-md text-center border-dashed border-2 shadow-none bg-muted/30">
-            <CardHeader className="space-y-4 pb-2">
+          <Card className="w-full max-w-md text-center border-dashed border-2 bg-muted/30">
+            <CardHeader>
               <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit">
                 <Dumbbell className="w-10 h-10 text-primary" />
               </div>
-              <CardTitle className="text-2xl">You don't have a plan</CardTitle>
-              <CardDescription>
-                Start your journey by creating a custom workout plan tailored to your needs.
-              </CardDescription>
+              <CardTitle className="text-2xl">No Plans Yet</CardTitle>
+              <CardDescription>Create your first plan to start tracking.</CardDescription>
             </CardHeader>
-            <CardContent className="pt-6">
-              <Button 
-                size="lg" 
-                className="w-full gap-2"
-                onClick={() => setShowCreator(true)}
-              >
-                <FilePlus className="w-4 h-4" />
-                Create New Plan
+            <CardContent>
+              <Button size="lg" className="w-full gap-2" onClick={() => setShowCreator(true)}>
+                <FilePlus className="w-4 h-4" /> Create New Plan
               </Button>
             </CardContent>
           </Card>
@@ -172,76 +115,70 @@ export default function Plan() {
     );
   }
 
-  // ------------------------------------------------------------------
-  // السيناريو الثاني: المستخدم لديه خطة (عرض الخطة)
-  // ------------------------------------------------------------------
-  if (hasPlan && !showCreator) {
-     return (
-        <MainLayout title="My Current Plan" subtitle="Track your progress">
-            <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-                <Card className="w-full max-w-lg">
-                    <CardHeader>
-                        <CardTitle>Your Active Plan</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-muted-foreground mb-4">You have an active plan saved.</p>
-                        <Button variant="outline" onClick={() => setShowCreator(true)}>Edit / Create New</Button>
-                    </CardContent>
-                </Card>
-            </div>
-        </MainLayout>
-     )
+  // 2. شاشة عرض الخطط
+  if (plans.length > 0 && !showCreator) {
+    return (
+      <MainLayout title="My Plans" subtitle={`You have ${plans.length} active plans`}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4">
+          <Card 
+            className="border-dashed flex flex-col items-center justify-center p-6 cursor-pointer hover:bg-muted/50 transition-all min-h-[200px]"
+            onClick={() => setShowCreator(true)}
+          >
+            <FilePlus className="w-10 h-10 text-muted-foreground mb-2" />
+            <span className="font-bold text-muted-foreground">Add Another Plan</span>
+          </Card>
+
+          {plans.map((p, i) => (
+            <Card key={i} className="shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3 border-b bg-muted/20">
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-lg">{p.name}</CardTitle>
+                  <span className="text-[10px] bg-primary text-primary-foreground font-bold px-2 py-1 rounded-full uppercase">{p.type}</span>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="flex justify-between text-sm text-muted-foreground mb-4">
+                    <span>{p.muscles.length} Muscles</span>
+                    <span>{p.muscles.reduce((a, b) => a + b.exerciseCount, 0)} Exercises</span>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1">View</Button>
+                    <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => {
+                        if(confirm("Delete this plan?")) setPlans(plans.filter((_, idx) => idx !== i))
+                    }}>
+                        <Trash2 className="w-4 h-4" />
+                    </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </MainLayout>
+    );
   }
 
-  // ------------------------------------------------------------------
-  // السيناريو الثالث: وضع الإنشاء (showCreator === true)
-  // يتم عرض الكود الأصلي الخاص بك هنا
-  // ------------------------------------------------------------------
+  // 3. شاشة الإنشاء (Creator Mode)
   return (
-    <MainLayout title="Create Training Plan" subtitle="Build Custom Programs">
-        {/* زر للعودة للخلف إذا أراد المستخدم إلغاء الإنشاء */}
-        {!hasPlan && (
-            <div className="mb-4">
-                 <Button variant="ghost" size="sm" onClick={() => setShowCreator(false)}>← Back</Button>
-            </div>
-        )}
-
+    <MainLayout title="Plan Creator" subtitle="Designing new routine">
       <div className="grid lg:grid-cols-12 gap-6 pb-24">
-        {/* Left Side - Controls + Table */}
+        {/* Left Side: Controls */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Plan Information */}
           <Card>
-            <CardHeader>
-              <CardTitle>Plan Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
+            <CardHeader><CardTitle>Plan Info</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
               <div>
                 <Label>Plan Name</Label>
-                <Input
-                  value={plan.name}
-                  onChange={(e) => {
-                    setPlan((p) => ({ ...p, name: e.target.value }));
-                    setNameError("");
-                  }}
-                  placeholder="e.g., Full Body 4-Day Program"
+                <Input 
+                  value={plan.name} 
+                  onChange={(e) => { setPlan(p => ({ ...p, name: e.target.value })); setNameError(""); }}
+                  placeholder="e.g. Hypertrophy A"
                   className={nameError ? "border-red-500" : ""}
                 />
-                {nameError && (
-                  <p className="text-sm text-red-500 mt-1">{nameError}</p>
-                )}
               </div>
-
               <div>
-                <Label>Plan Type</Label>
-                <Select
-                  value={plan.type}
-                  onValueChange={(v) =>
-                    setPlan((p) => ({ ...p, type: v as any }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Label>Type</Label>
+                <Select value={plan.type} onValueChange={(v:any) => setPlan(p => ({ ...p, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="basic">Basic</SelectItem>
                     <SelectItem value="gold">Gold</SelectItem>
@@ -253,254 +190,115 @@ export default function Plan() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>selected muscles</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Selected Muscles</CardTitle></CardHeader>
             <CardContent>
-              {plan.muscles.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                   No muscles selected yet                 
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {plan.muscles.map((muscle) => (
-                    <div
-                      key={muscle.id}
-                      className="flex flex-wrap gap-3 items-center border-b pb-3 last:border-0"
-                    >
-                      <div className="flex-1 font-medium">{muscle.muscleName}</div>
-
-                      <div className="flex gap-2 items-center">
-                        <Label className="text-xs">Exercises</Label>
-                        <Input
-                          type="number"
-                          value={muscle.exerciseCount}
-                          onChange={(e) =>
-                            updateMuscle(muscle.id, "exerciseCount", Number(e.target.value))
-                          }
-                          min={1}
-                          className="w-16 h-8"
-                        />
-                      </div>
-
-                      <div className="flex gap-2 items-center">
-                        <Label className="text-xs">Sets</Label>
-                        <Input
-                          type="number"
-                          value={muscle.sets}
-                          onChange={(e) =>
-                            updateMuscle(muscle.id, "sets", Number(e.target.value))
-                          }
-                          min={1}
-                          className="w-16 h-8"
-                        />
-                      </div>
-
-                      <div className="flex gap-2 items-center">
-                        <Label className="text-xs">Reps</Label>
-                        <Input
-                          value={muscle.reps}
-                          onChange={(e) =>
-                            updateMuscle(muscle.id, "reps", e.target.value)
-                          }
-                          className="w-20 h-8"
-                          placeholder="8-12"
-                        />
-                      </div>
-
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-600 hover:text-red-700"
-                        onClick={() => removeMuscle(muscle.id)}
-                      >
-                        حذف
-                      </Button>
+                {plan.muscles.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">No muscles selected yet</div>
+                ) : (
+                    <div className="space-y-4">
+                    {plan.muscles.map((muscle) => (
+                        <div key={muscle.id} className="group flex items-center justify-between gap-4 border-b pb-4 last:border-0 hover:bg-muted/30 p-2 rounded-lg transition-all">
+                        <div className="flex-1 min-w-[120px]">
+                            <span className="font-semibold text-sm sm:text-base text-foreground">{muscle.muscleName}</span>
+                        </div>
+                        <div className="flex items-center gap-4 sm:gap-6">
+                            <div className="flex flex-col items-center gap-1">
+                                <Label className="text-[10px] uppercase text-muted-foreground font-bold">Exer</Label>
+                                <Input type="number" value={muscle.exerciseCount} onChange={(e) => updateMuscle(muscle.id, "exerciseCount", Number(e.target.value))} min={1} className="w-14 h-9 text-center bg-background"/>
+                            </div>
+                            <div className="flex flex-col items-center gap-1">
+                                <Label className="text-[10px] uppercase text-muted-foreground font-bold">Sets</Label>
+                                <Input type="number" value={muscle.sets} onChange={(e) => updateMuscle(muscle.id, "sets", Number(e.target.value))} min={1} className="w-14 h-9 text-center bg-background"/>
+                            </div>
+                            <div className="flex flex-col items-center gap-1">
+                                <Label className="text-[10px] uppercase text-muted-foreground font-bold">Reps</Label>
+                                <Input value={muscle.reps} onChange={(e) => updateMuscle(muscle.id, "reps", e.target.value)} className="w-16 h-9 text-center text-sm bg-background" placeholder="8-12"/>
+                            </div>
+                            <div className="pt-5"> 
+                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all rounded-full" onClick={() => removeMuscle(muscle.id)}>
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+                        </div>
+                    ))}
                     </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totals.totalMuscles}</div>
-                  <div className="text-xs text-muted-foreground">عضلات</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totals.totalExercises}</div>
-                  <div className="text-xs text-muted-foreground">تمارين</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totals.totalSets}</div>
-                  <div className="text-xs text-muted-foreground">مجموعات</div>
-                </div>
-              </div>
+                )}
+                {plan.muscles.length > 0 && (
+                  <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t bg-muted/20 rounded-xl p-4">
+                      <div className="text-center">
+                          <div className="text-2xl font-bold text-primary">{totals.totalMuscles}</div>
+                          <div className="text-xs font-medium text-muted-foreground uppercase">عضلات</div>
+                      </div>
+                      <div className="text-center border-x">
+                          <div className="text-2xl font-bold text-primary">{totals.totalExercises}</div>
+                          <div className="text-xs font-medium text-muted-foreground uppercase">تمارين</div>
+                      </div>
+                      <div className="text-center">
+                          <div className="text-2xl font-bold text-primary">{totals.totalSets}</div>
+                          <div className="text-xs font-medium text-muted-foreground uppercase">مجموعات</div>
+                      </div>
+                  </div>
+                )}
             </CardContent>
           </Card>
         </div>
 
+        {/* Right Side: Map */}
         <div className="lg:col-span-7">
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-2">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <CardTitle>Choose Muscle</CardTitle>
-
-                <div className="flex items-center gap-3">
-                  <ToggleGroup
-                    type="single"
-                    value={viewMode}
-                    onValueChange={(v) => v && setViewMode(v as any)}
-                  >
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Muscle Map</CardTitle>
+                <div className="flex gap-2">
+                  <ToggleGroup type="single" value={viewMode} onValueChange={(v:any) => v && setViewMode(v)}>
                     <ToggleGroupItem value="front">Front</ToggleGroupItem>
                     <ToggleGroupItem value="back">Back</ToggleGroupItem>
                   </ToggleGroup>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsMale(!isMale)}
-                  >
-                    {isMale ? "Male" : "Female"}
-                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setIsMale(!isMale)}>{isMale ? "Male" : "Female"}</Button>
                 </div>
               </div>
             </CardHeader>
-
-            <CardContent className="p-3">
+            <CardContent className="flex justify-center p-6 bg-muted/10 rounded-b-xl overflow-hidden">
+                <style>{`
+                    .muscleSvg g.bodymap { color: hsl(var(--muted-foreground)); cursor: pointer; transition: all .12s ease; }
+                    .muscleSvg g.bodymap:hover { color: hsl(var(--foreground)); filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1)); }
+                    .muscleSvg g.bodymap.is-selected { color: hsl(var(--primary)); }
+                `}</style>
               {isMale ? (
                 viewMode === "front" ? (
-                  <div className="w-full rounded-xl border bg-muted/10 p-3 overflow-auto">
-                    <style>{`
-                      .muscleSvg g.bodymap { 
-                        color: hsl(var(--muted-foreground)); 
-                        cursor: pointer; 
-                        transition: all .12s ease; 
-                      }
-                      .muscleSvg g.bodymap:hover { 
-                        color: hsl(var(--foreground)); 
-                        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1)); 
-                      }
-                      .muscleSvg g.bodymap.is-selected { 
-                        color: hsl(var(--primary)); 
-                      }
-                    `}</style>
-                    <svg
-                      className="muscleSvg w-full max-w-[400px] mx-auto h-auto"
-                      viewBox="0 0 660.46 1206.46"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      onClick={(e) => {
-                        const g = (e.target as Element).closest("g.bodymap");
-                        if (g?.id) addMuscle(g.id);
-                      }}
-                    >
-                <g id="calves" className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100">
-                  <path d="M502.8,1183.5c-.68,1.05-1.86,1.29-2.74,1.31-.93.02-1.69.81-1.69,1.77,0,.38-.14,1.54-.78,2.18-.39.38-.97.56-1.75.53-.8-.04-1.51.52-1.72,1.32,0,.03-.6,2.33-2.27,3.3-.86.51-1.88.59-3.12.24-.69-.19-1.44.07-1.86.67-.02.03-1.86,2.61-4.39,2.9-1.39.17-2.76-.38-4.19-1.68-.68-.62-1.71-.58-2.35.08-.04.04-4.49,4.53-10.15,3.77-4.52-.61-8.73-4.34-12.51-11.09-.21-.39-.58-.69-1.02-.81-.57-.17-14.2-4.29-13.15-17.37.18-5.53-4.76-8.41-11.01-12.05l-.97-.57c-5.92-3.45-9.83-5.73-6.12-27.69.89-7.14-.42-14.69-.48-15-.11-.62-.33-1.05-.9-1.25-.42-.36-3.52-3.52-2.29-17.55,1.51-17.34,2.94-33.72-17.75-101.36-1.11-3.85-2.68-6.08-4.18-8.24-4.08-5.83-8.31-11.86-2.32-56.42,2.35-21.34,3.14-29.8,2.5-34.69,6.67,6.59,14.23,10.26,21.63,10.26h.34c8.38-.13,15.5-4.85,20.06-13.29,4.38-8.1,7.01-11.48,12.38-13.17.31.97.72 2.16 1.23 3.63,5.67 16.3 20.73 59.59 8.3 131.92,0 .05 0 .1-.02.15-.7 7.93-1.67 16.17-2.6 24.14-2.43 20.85-4.73 40.55-2.42 53.28,1.72 10.5 2.43 14.98 2.6 20.5,0 .15.03.3.07.45,1.34 4.55 8.23 15.73 12.79 23.12,1.33 2.14 2.46 4 3.13 5.14.8 1.37 1.22 2.38 1.59 3.25,1.09 2.59 1.89 4.14 6.89 8.26.9.74 1.83 1.49 2.8 2.26,6.46 5.2 13.78 11.1 17.75 20.07,1.41 3.47 1.65 6.21.69 7.71Z" fill="currentColor"></path>
-                  <path d="M265.06,986.92c-1.51,2.16-3.08,4.4-4.18,8.22-20.71,67.67-19.28,84.05-17.76,101.38,1.22,14.03-1.87,17.2-2.29,17.55-.56.2-.79.63-.9,1.25-.05.31-1.37,7.86-.47,15.08,3.7,21.87-.21,24.15-6.13,27.61l-.98.57c-6.25,3.64-11.18,6.51-10.99,12.13,1.04,12.99-12.58,17.12-13.16,17.28-.44.12-.8.42-1.02.81-3.78,6.75-7.99,10.47-12.51,11.09-5.67.76-10.1-3.72-10.15-3.77-.63-.66-1.67-.7-2.35-.08-1.42,1.29-2.8,1.84-4.18,1.68-2.53-.29-4.39-2.88-4.41-2.9-.42-.6-1.15-.87-1.85-.67-1.25.35-2.28.27-3.13-.24-1.67-.98-2.27-3.28-2.27-3.3-.2-.8-.91-1.36-1.72-1.33-.79.03-1.36-.15-1.75-.53-.64-.64-.78-1.79-.78-2.17,0-.96-.74-1.76-1.68-1.77-.88-.02-2.07-.26-2.75-1.31-.96-1.5-.72-4.24.67-7.66,4-9.02,11.31-14.92,17.78-20.12.96-.77,1.89-1.52,2.79-2.26,5-4.13,5.8-5.67,6.89-8.26.37-.88.79-1.88,1.59-3.25.67-1.15,1.81-2.99,3.12-5.13,4.56-7.4,11.46-18.58,12.8-23.13.04-.15.07-.3.07-.45.17-5.52.88-10,2.6-20.47,2.31-12.77,0-32.47-2.42-53.32-.93-7.96-1.9-16.21-2.6-24.14,0-.05,0-.1-.02-.15-12.43-72.33,2.63-115.62,8.3-131.92.51-1.47.92-2.66,1.23-3.63,5.38,1.69,8,5.06,12.39,13.17,4.55,8.44,11.67,13.16,20.05,13.29h.35c7.39,0,14.95-3.67,21.62-10.27-.64,4.9.15,13.37,2.5,34.74,5.99,44.51,1.77,50.55-2.31,56.38Z" fill="currentColor"></path>
-                </g>
-                <g id="quads" className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100">
-                  <path d="M452.4,783.8s0,.06-.02.09c0,.02,0,.04,0,.06-.8,3.72-1.52,7.5-2.22,11.15-3.01,15.71-5.86,30.55-13.07,34.21-2.93,1.49-6.55,1.09-11.09-1.18-2.16-1.08-4.06-1.25-5.66-.47-3.13,1.52-4.12,5.95-5.38,11.57-2.08,9.29-4.43,19.83-16.56,20.04h-.25c-22.01,0-29.18-50.54-29.24-51.05,0-.05-.02-.1-.03-.14-2.46-18.26-6.39-36.59-11.76-54.7-1.1-3.72-2.91-8.81-5.01-14.71-6.53-18.38-16.39-46.18-17.75-68.65-.11-3.62-.17-6.84-.23-9.67-.15-7.05-.24-11.52-.79-14.17,14.83-2.06,21.68-20.6,33.8-62.45,13.65-47.17,49.14-60.08,62.35-63.31,2.7,21.79,6.16,45.47,8.19,53.68.14.55.33,1.32.59,2.31,9.41,36.36,27.37,122.24,14.14,207.42Z" fill="currentColor"></path>
-                  <path d="M327.13,646.17c-.55,2.65-.64,7.12-.79,14.17-.05,2.83-.12 6.06-.22 9.62-1.36,22.53-11.23,50.32-17.75,68.7-2.1,5.9-3.9,11-5.01,14.71-5.37,18.13-9.32,36.48-11.77,54.76,0,.03-.02.05-.02.08-.08.52-7.24,51.05-29.25,51.05h-.25c-12.12-.21-14.48-10.74-16.56-20.04-1.26-5.61-2.25-10.04-5.38-11.57-1.59-.78-3.49-.61-5.66.47-4.54,2.27-8.16,2.66-11.09,1.18-7.21-3.66-10.06-18.5-13.07-34.21-.71-3.71-1.44-7.54-2.26-11.3v-.03c-13.22-85.17,4.75-171.04,14.15-207.39.26-.99.45-1.76.59-2.31,2.03-8.2,5.5-31.89,8.2-53.68,13.22,3.23,48.69,16.15,62.34,63.31,12.12,41.86,18.97,60.39,33.8,62.45Z" fill="currentColor"></path>
-                </g>
-                <g id="abdominals" className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100" fill="mw-red">
-                  <path d="M385.82,350.44c-2.32-5.36-9.35-9.32-16.39-12.32-.03-.02-.05-.03-.08-.03-1.6-.57-3.18-1.2-4.75-1.9-.03,0-.06-.02-.09-.04-10.51-3.96-23.74-6.74-29.44-2.69-1.99,1.42-2.95,3.62-2.95,6.73,0,.97-.77,1.75-1.71,1.75-.06,0-.12,0-.17,0-.06,0-.12,0-.18,0-.94,0-1.71-.78-1.71-1.75,0-3.11-.97-5.32-2.95-6.73-5.7-4.06-18.93-1.27-29.44,2.69-.03.02-.06.03-.09.04-1.57.7-3.15,1.33-4.75,1.9-.03.02-.07.03-.11.04-7.03,3-14.03,6.96-16.36,12.31-1.47,3.38-.66,6.05.81,10.88,1.22,4.02,2.84,9.3,3.56,17.09,0,0,0,.03,0,.04.11.8.17,1.63.21,2.49.03.67.08,1.35.1,2.06.1,2.61.04,3.85-.03,5.54-.09,1.82-.21,4.31-.15,9.95.09,11.41,2.3,60.52,4.34,93.24,3.28,52.64,34.75,92.8,46.58,92.8.06,0,.12,0,.18,0,.05,0,.11,0,.17,0,11.83,0,43.3-40.16,46.58-92.8,2.05-32.73,4.24-81.84,4.34-93.24.05-5.64-.07-8.13-.15-9.95-.08-1.7-.14-2.93-.03-5.54.03-.71.07-1.39.1-2.06.03-.87.09-1.7.21-2.49,0-.02,0-.04,0-.04.73-7.79,2.34-13.07,3.56-17.09,1.47-4.83,2.28-7.5.81-10.88ZM332.12,571.92c0,.97-.77,1.75-1.71,1.75h-.35c-.94,0-1.71-.78-1.71-1.75v-67.35c0-.96.77-1.75,1.71-1.75h.35c.94,0,1.71.79,1.71,1.75v67.35ZM361.89,479.09c-5.77-.12-20.94,1.39-26.17,2.61-2.83.66-3.58,3.45-3.77,7.75.05,1.27.05,2.54.05,3.74v.79c0,.96-.77,1.75-1.71,1.75h-.11c-.94,0-1.71-.79-1.71-1.75v-.79c0-1.21,0-2.47.05-3.74-.19-4.29-.94-7.09-3.76-7.75-5.24-1.22-20.4-2.73-26.18-2.61h-.03c-.93,0-1.69-.75-1.71-1.7-.02-.97.73-1.77,1.68-1.79,6.09-.13,21.47,1.41,27,2.69,2.28.53,3.77,1.79,4.73,3.46.95-1.67,2.44-2.93,4.72-3.46,5.54-1.29,20.94-2.82,27-2.69.95.03,1.69.82,1.68,1.79-.02.96-.81,1.77-1.75,1.7ZM369.89,472.83c-5.48.19-9.3.47-12.68.72-4.2.31-7.74.56-12.89.56-1.67,0-3.5-.03-5.59-.09-4.64-.35-7.15-1.87-8.5-5.2-1.34,3.33-3.83,4.84-8.43,5.19-2.13.06-4,.1-5.7.1-5.14,0-8.67-.26-12.86-.56-3.38-.24-7.2-.52-12.68-.72-.94-.04-1.69-.85-1.65-1.81.03-.97.8-1.73,1.77-1.69,5.54.2,9.39.48,12.8.73,5.48.39,9.8.71,18.14.46,5.19-.4,6.72-1.24,6.72-17.55,0-.96.77-1.75,1.71-1.75.06,0,.12,0,.18,0,.05,0,.11,0,.17,0,.94,0,1.71.79,1.71,1.75,0,16.31,1.52,17.15,6.79,17.55,8.27.24,12.59-.07,18.06-.46,3.41-.24,7.26-.52,12.8-.73h.06c.92,0,1.68.74,1.71,1.69.03.96-.71,1.77-1.65,1.81ZM298.34,426.66c5.55-.66,14.83-1.75,23.1-1.63,4.85.07,7.43,2,8.8,4.75,1.36-2.74,3.93-4.68,8.79-4.75,8.27-.11,17.55.98,23.1,1.63.94.11,1.62.98,1.51,1.94-.11.96-.97,1.64-1.9,1.54-5.47-.65-14.61-1.73-22.66-1.62-5.95.08-6.95,3.1-6.95,12.13,0,.97-.77,1.75-1.71,1.75-.06,0-.12,0-.17,0-.06,0-.12,0-.18,0-.94,0-1.71-.78-1.71-1.75,0-9.03-1-12.06-6.95-12.13-8.03-.11-17.2.97-22.66,1.62-.93.11-1.79-.58-1.9-1.54-.1-.96.56-1.83,1.51-1.94ZM371.36,425.01l-1.44.03c-3.47.06-6.9.11-10.21.11-11.14,0-21.01-.65-26.98-4.11-1.08-.62-1.89-1.43-2.5-2.4-.62.96-1.43,1.77-2.51,2.4-5.97,3.46-15.84,4.11-26.98,4.11-3.31,0-6.73-.05-10.21-.11l-1.44-.03c-.94,0-1.69-.8-1.69-1.77.02-.95.78-1.72,1.71-1.72h.03l1.44.03c14.67.24,28.5.48,35.44-3.54,1.7-.99,2.32-3.08,2.47-6.24-.08-1.48-.05-3.05,0-4.7-.02-.52-.03-1.08-.05-1.64-.06-1.77-.13-3.58-.13-5.5,0-.96.77-1.75,1.71-1.75.06,0,.12,0,.18,0,.05,0,.11,0,.17,0,.94,0,1.71.79,1.71,1.75,0,1.91-.06,3.74-.13,5.5-.02.52-.03,1.02-.04,1.5.05,1.73.08,3.39,0,4.94.17,3.1.79,5.17,2.47,6.15,6.94,4.02,20.78,3.79,35.44,3.54l1.44-.03h.03c.93,0,1.69.77,1.71,1.72,0,.97-.74,1.77-1.69,1.77ZM298.11,377.35l1.21-.32c5.42-1.47,14.52-3.92,22.23-2.57,4.77.83,7.32,2.92,8.69,5.58,1.36-2.66,3.92-4.75,8.68-5.58,7.72-1.35,16.8,1.1,22.23,2.57l1.21.32c.92.24,1.47,1.2,1.23,2.13-.24.94-1.17,1.49-2.09,1.25l-1.22-.32c-5.16-1.4-13.79-3.72-20.78-2.51-6.27,1.09-7.38,4.37-7.38,10.86,0,.96-.77,1.75-1.71,1.75-.06,0-.12,0-.17,0-.06,0-.12,0-.18,0-.94,0-1.71-.79-1.71-1.75,0-6.49-1.1-9.77-7.38-10.86-6.99-1.22-15.62,1.12-20.78,2.51l-1.22.32c-.92.24-1.85-.31-2.09-1.25-.23-.94.32-1.89,1.23-2.13ZM375.7,377.49c-.21.76-.9,1.26-1.64,1.26-.15,0-.32-.02-.48-.07-13.9-4.14-23.32-6.63-37.09-6.36-3.26-.02-5.15-1.85-6.25-4.72-1.1,2.87-2.99,4.7-6.23,4.72-13.79-.28-23.22,2.22-37.12,6.36-.16.05-.33.07-.48.07-.74,0-1.43-.5-1.64-1.26-.27-.93.26-1.9,1.16-2.17,14.22-4.23,23.88-6.78,38.11-6.5,4.01-.02,4.31-6.78,4.31-17.11,0-.97.77-1.75,1.71-1.75.06,0,.12,0,.18,0,.05,0,.11,0,.17,0,.94,0,1.71.78,1.71,1.75,0,10.32.3,17.09,4.35,17.11,14.19-.29,23.85,2.26,38.07,6.5.91.27,1.43,1.24,1.16,2.17Z" fill="currentColor"></path>
-                </g>
-                <g id="obliques" className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100">
-                  <path d="M272.8,406.06c-2.74,15.58-5.85,33.23-3.49,49.66,4.83,33.57-6.55,48.85-11.65,53.86-6.22,6.09-16.8,8.99-26.23,7.31,1.27-10.42,2.32-20.17,2.91-27.28.42-5.01,1.09-10.04,1.79-15.35,2.58-19.47,5.24-39.6-4.39-59.14-19.23-37.82-24.33-61.62-25.32-67.11,1.13-3.44,1.99-6.98,2.58-10.55.92-5.82,3.02-19.11-1.38-29.2,2.28,2.19,4.33,4.6,6.29,7.03,1.18,1.46,2.4,2.87,3.68,4.21,10.16,11.56,22.09,22.06,32.62,31.32,13.18,11.59,24.56,21.61,25.39,27.78,0,.05.02.11.02.16.08.83.15,1.69.2,2.58,0,.06,0,.12,0,.19.18,6.35-1.32,14.88-3.02,24.53Z" fill="currentColor"></path>
-                  <path d="M426.13,489.61c.6,7.11,1.65,16.86,2.91,27.28-9.43,1.68-20.01-1.22-26.23-7.31-5.11-5.01-16.47-20.29-11.65-53.86,2.36-16.44-.74-34.09-3.49-49.66-1.7-9.65-3.2-18.18-3.02-24.53,0-.07,0-.13,0-.19.05-.89.12-1.75.2-2.58,0-.05,0-.11.02-.16.84-6.17,12.22-16.19,25.39-27.78,10.5-9.23,22.37-19.69,32.5-31.19,1.33-1.39,2.59-2.83,3.81-4.34,1.96-2.42,4-4.83,6.27-7.02-4.4,10.09-2.29,23.37-1.36,29.19.57,3.57,1.44,7.12,2.58,10.57-1,5.53-6.13,29.33-25.33,67.12-9.62,19.52-6.96,39.65-4.38,59.11.7,5.32,1.37,10.34,1.79,15.35Z" fill="currentColor" strokeWidth="0"></path>
-                </g>
-                <g id="hands" className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100">
-                  <path d="M641.72,606.51c-.72-3.08-1.76-4.39-3.21-6.2-1.2-1.5-2.6-3.25-4-6.33.39,3.69,1.45,5.88,2.44,7.89,1.11,2.27,2.25,4.62,2.18,8.39-.07,3.27.15,5.48.38,7.62.33,3.14.62,6.1-.21,11.37-.3,1.91-.05,3.3.75,4.16.73.78,1.89,1.09,2.88,1.21,0-1.21.15-2.5.39-3.88,1.61-9.13,1.28-10.51.27-14.63-.51-2.08-1.2-4.91-1.87-9.61Z" fill="currentColor"></path>
-                  <path d="M655.51,598.27c-.58-4.99-.72-7.9-.82-10.02q-.21-4.45-5.12-14.28l-.18-.36c-6.84-13.19-9.99-23.35-12.78-32.31-1.45-4.67-2.85-9.18-4.69-13.83-1.93,5.8-5.47,10.35-9.99,12.65-2.37,1.21-5.09,1.81-8.01,1.81-2.11,0-4.34-.31-6.58-.95.85,2.46,1.09,4.63.17,6.03-4.68,6.58-2.36,14.08.2,17.27,2.83,3.53,4.31,8.29,5.46,17.55.27,3.06.39,5.9.5,8.64.51,11.95,1.24,16.45,6.93,16.34,1.02-.03,1.84-.44,2.59-1.3,3.93-4.54,3.47-18.56,2.97-23.58-.06-.57.15-1.13.57-1.49.42-.38.99-.52,1.52-.39.19.05,4.63,1.19,7.36,6.91.04.09.08.18.1.27,1.84,6.32,3.76,8.72,5.45,10.85,1.55,1.93,3,3.77,3.91,7.68,0,.05.02.1.03.15.65,4.56,1.3,7.22,1.81,9.35,1.07,4.41,1.51,6.24-.22,16.09-.32,1.82-.42,3.43-.28,4.81.16,1.79.7,3.21,1.62,4.23,1.26,1.43,3.05,1.84,4.21,1.97,1.89-6.82,4.46-16.62,4.59-18.79l.02-.22c.21-3.33.56-8.92-1.34-25.07Z" fill="currentColor"></path>
-                  <path d="M18.73,606.51c-.68,4.69-1.37,7.54-1.87,9.61-.99,4.13-1.33,5.52.27,14.63.24,1.38.38,2.68.38,3.88.99-.11,2.15-.43,2.88-1.21.8-.86,1.05-2.26.75-4.16-.84-5.27-.53-8.24-.21-11.37.22-2.14.44-4.35.38-7.62-.08-3.78,1.06-6.12,2.17-8.39.98-2.01,2.04-4.2,2.44-7.89-1.39,3.08-2.8,4.83-4,6.33-1.45,1.81-2.49,3.12-3.21,6.2Z" fill="currentColor" strokeWidth="0"></path>
-                  <path d="M52.99,547.07c-.92-1.42-.69-3.62.16-6.09-2.25.64-4.48.96-6.61.96-2.91,0-5.64-.6-8.01-1.81-4.53-2.3-8.08-6.87-9.99-12.67-1.83,4.66-3.23,9.18-4.69,13.85-2.79,8.96-5.95,19.12-12.8,32.34l-.16.33q-4.91,9.83-5.12,14.28c-.1,2.12-.23,5.03-.82,10.02-1.91,16.16-1.55,21.74-1.34,25.08l.02.21c.14,2.17,2.7,11.97,4.6,18.79,1.15-.12,2.94-.54,4.21-1.97.87-.98,1.4-2.33,1.59-4.01,0-.08,0-.15.02-.23.14-1.38.03-2.98-.28-4.8-1.74-9.85-1.29-11.68-.22-16.09.52-2.12,1.16-4.77,1.81-9.35,0-.05.02-.1.03-.15.91-3.91,2.37-5.74,3.91-7.68,1.69-2.12,3.61-4.53,5.45-10.85.03-.09.06-.18.1-.27,2.73-5.72,7.17-6.85,7.36-6.91.54-.13,1.1.02,1.52.39.42.37.63.93.57,1.49-.5,5.02-.96,19.04,2.97,23.58.75.87,1.57,1.28,2.6,1.3,5.73.12,6.43-4.39,6.92-16.34.12-2.74.24-5.58.5-8.57,1.16-9.34,2.64-14.09,5.47-17.62,2.56-3.19,4.88-10.69.23-17.22Z" fill="currentColor"></path>
-                </g>
-                <g id="forearms" className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100">
-                  <path d="M629.69,522.22c-1.13,6.78-4.65,12.42-9.28,14.77-4.03,2.05-9.46,1.91-15.01-.38-2.21-4.21-5.19-8.37-6.61-10.26-.04-.04-.08-.1-.13-.14-8.02-8.58-14.46-13.59-20.69-18.45-8.62-6.72-16.75-13.06-28.61-28.19-12.92-16.47-16.63-24.46-20.56-32.91-2.42-5.19-4.92-10.57-9.56-18.2-.02-.03-.03-.05-.05-.08-2.17-3.18-6.32-8.99-11.24-15.81,7.32,5.22,14.13,7.31,19.91,7.31,3.54,0,6.69-.78,9.33-2.12,5.52-2.78,12.21-9.26,12.71-24.32.21-6.44-.72-13.94-2.78-22.46.3.72.6,1.44.91,2.18,2.49,6.15,5.69,9.56,11.5,15.77,4.14,4.41,9.81,10.46,17.68,20.13,13.13,16.15,26.59,50.24,37.42,77.64,4.49,11.37,8.74,22.12,12.4,30.19.02.04.03.08.05.11.97,1.78,1.83,3.52,2.62,5.24Z" fill="currentColor"></path>
-                  <path d="M152.48,412.57c-4.91,6.81-9.05,12.62-11.22,15.8-.02.03-.03.05-.05.08-4.64,7.64-7.14,13.01-9.56,18.2-3.93,8.45-7.64,16.44-20.56,32.91-11.86,15.13-20,21.47-28.61,28.19-6.23,4.86-12.66,9.88-20.69,18.45-.04.04-.09.1-.13.14-1.41,1.89-4.39,6.04-6.6,10.26-5.54,2.29-10.98,2.44-15.02.38-4.63-2.35-8.15-7.98-9.28-14.77.79-1.71,1.65-3.45,2.62-5.24.02-.04.04-.08.06-.11,3.65-8.06,7.9-18.81,12.39-30.19,10.82-27.4,24.28-61.49,37.42-77.64,7.86-9.67,13.54-15.72,17.68-20.13,5.81-6.21,9.02-9.63,11.5-15.75.3-.71.58-1.41.88-2.1-2.04,8.48-2.96,15.95-2.75,22.36.49,15.06,7.18,21.54,12.7,24.32,2.64,1.34,5.79,2.12,9.33,2.12,5.77,0,12.57-2.09,19.88-7.29Z" fill="currentColor"></path>
-                </g>
-                <g className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100" id="biceps">
-                  <path d="M535.68,414.61c-8.57,4.33-23.53,1.71-39.79-18.59-.02-.02-.03-.04-.05-.06-9.71-13.16-19.05-25.49-21.34-27.65-.5-.47-1.05-.99-1.66-1.54-4.5-4.14-11.31-10.39-15.31-20.4-.14-.35-.37-.62-.67-.8,0,0,0,0,0,0-.86-2.84-1.54-5.75-2.01-8.66-1.1-6.96-4.03-25.45,5.81-33.63,5.53-4.61,13.2-4.37,21.33-4.14.92.03,2.27.1,3.94.29,0,0,.03,0,.03,0,.04,0,.09.02.13.02.02,0,.03,0,.05,0,.03,0,.06,0,.09,0,2.54.31,5.82.88,9.54,1.98,0,0,0,0,.02,0,.14.06.29.11.45.12.02,0,.03,0,.03,0,2.49.75,5.18,1.73,7.97,3.01,3.26,1.5,6.39,3.29,9.32,5.29.45.54.96,1.08,1.5,1.67,2.81,3.02,7.61,8.17,16.01,24.38,0,.02.02.03.02.04,0,0,0,.02.02.03,25.45,57.59,13.79,73.98,4.57,78.62Z" fill="currentColor"></path>
-                  <path d="M205.61,336.89c-.47,2.92-1.15,5.82-2.01,8.66-.3.19-.54.47-.68.82-4,10-10.81,16.26-15.31,20.4-.61.55-1.16,1.07-1.66,1.54-2.28,2.16-11.63,14.49-21.34,27.65-.02.02-.03.04-.05.06-16.26,20.3-31.21,22.91-39.79,18.59-9.21-4.64-20.86-21.02,4.53-78.53,0,0,0,0,0-.02l.03-.05c8.42-16.29,13.23-21.44,16.04-24.47.55-.59,1.05-1.13,1.51-1.68,2.92-2,6.05-3.78,9.3-5.27,2.82-1.29,5.55-2.28,8.08-3.03.11-.04.23-.07.35-.11,0,0,.02,0,.03,0,3.72-1.08,7.02-1.67,9.57-1.98.03,0,.07,0,.1,0h.02c.05,0,.11,0,.16-.02.02,0,.03,0,.04,0h0c1.67-.19,2.99-.26,3.91-.29,8.13-.24,15.8-.47,21.33,4.14,9.84,8.18,6.91,26.67,5.81,33.62Z" fill="currentColor"></path>
-                </g>
-                <g id="front-shoulders" className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100">
-                  <path d="M510.6,303.91c-1.61-.91-3.25-1.75-4.94-2.53-7.64-3.49-14.56-4.88-19.19-5.42-7.44-1.87-13.18-4.12-16.62-6.5-12.81-8.87-22.9-20.97-27.79-26.83-4.59-5.52-7.95-10.07-10.92-14.08-6.46-8.74-11.12-15.05-22.12-22.2-5.2-3.37-11.11-5.94-15.09-7.49,8.34-2.74,26.96-7.7,44.59-4.11.97.24,1.99.51,3.04.78,1.25.32,2.34.6,3.08.8.34.09.84.17,1.59.3,32.54,5.37,45.89,28.26,51.36,46.48.75,2.74,1.56,4.76,2.58,7.33,2.02,5.07,5.06,12.69,10.42,33.46Z" fill="currentColor"></path>
-                  <path d="M266.59,218.87c-3.98,1.55-9.89,4.12-15.09,7.49-10.99,7.14-15.66,13.45-22.12,22.2-2.97,4.01-6.33,8.57-10.96,14.13-4.84,5.81-14.94,17.91-27.76,26.79-3.42,2.39-9.16,4.62-16.62,6.5,0,0-.03,0-.03,0-2.75.32-6.31.94-10.34,2.14-.11.03-.21.06-.32.1-2.66.79-5.53,1.83-8.5,3.18-1.69.77-3.34,1.62-4.95,2.53,5.37-20.76,8.41-28.39,10.43-33.47,1.02-2.56,1.82-4.59,2.57-7.29,5.48-18.25,18.83-41.15,51.37-46.52.75-.12,1.25-.21,1.59-.3.74-.2,1.83-.48,3.09-.8,1.06-.27,2.08-.53,3.06-.79.02,0,.04-.02.07-.02,17.61-3.55,36.17,1.39,44.49,4.14Z" fill="currentColor"></path>
-                </g>
-                <g id="chest" className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100">
-                  <path d="M473.89,295.55c-14.9.39-23.27,9.22-29.96,17.52-.93,1.15-1.89,2.26-2.88,3.34-.09.06-.16.13-.23.22-.15.17-.28.32-.44.49-18.16,19.25-45.55,26.23-69.71,17.75-1.63-.69-3.27-1.34-4.89-1.95-9.36-4.2-17.52-10.41-24.23-18.47-6.08-7.31-9.44-16.78-9.44-26.7v-49.81c0-.72.19-17.59,26.62-20.16,15.4-1.49,24.1,1.14,28.77,2.55.26.08.5.16.74.22.04.02.09.04.12.04,0,0,.03,0,.03,0h.02c.05.02.1.04.15.05.17.06.36.12.54.17,2.64.92,11.16,4,18.08,8.5,10.48,6.8,14.75,12.59,21.23,21.35,2.99,4.06,6.39,8.65,11.08,14.28,4.95,5.94,15.25,18.28,28.44,27.42,1.61,1.12,3.6,2.19,5.96,3.18Z" fill="currentColor"></path>
-                  <path d="M328.4,237.95v49.79c0,9.9-3.35,19.39-9.44,26.7-6.71,8.06-14.87,14.27-24.23,18.47-1.62.61-3.25,1.26-4.87,1.94-24.1,8.48-51.46,1.55-69.61-17.62-.19-.2-.37-.41-.55-.61-.08-.09-.15-.16-.24-.22-.98-1.08-1.94-2.19-2.87-3.34-6.69-8.3-15.07-17.13-29.96-17.52,2.36-1,4.35-2.06,5.95-3.18,13.19-9.14,23.49-21.48,28.48-27.46,4.65-5.59,8.04-10.18,11.04-14.24,6.48-8.76,10.75-14.55,21.23-21.35,6.92-4.49,15.44-7.58,18.08-8.5.18-.05.36-.11.54-.17.05,0,.1-.03.15-.05.03,0,.07-.02.09-.03.03,0,.06,0,.09-.03h0c.23-.06.48-.14.73-.22,4.66-1.42,13.36-4.05,28.77-2.55,26.44,2.57,26.63,19.44,26.62,20.19Z" fill="currentColor" strokeWidth="0"></path>
-                </g>
-                <g id="traps" className="bodymap text-mw-gray active:text-mw-red-700 lg:hover:text-mw-red-100">
-                  <path d="M287.92,178.7v20.85c0,10-5.2,13.67-16.13,17.47-3.35-1.33-19.62-7.35-37.88-7.02.31-.25.64-.52,1.01-.81,3.15-2.52,7.46-5.96,10.44-7.35,1.96-.92,6.52-2.88,11.35-4.94,7.4-3.17,15.8-6.78,18.88-8.35,3.68-1.87,9.2-6.86,12.32-9.84Z" fill="currentColor"></path>
-                  <path d="M426.68,210c-18.26-.34-34.53,5.69-37.89,7.02-10.92-3.79-16.12-7.47-16.12-17.47v-20.84c3.12,2.97,8.63,7.96,12.31,9.83,3.08,1.57,11.48,5.18,18.88,8.35,4.83,2.06,9.39,4.02,11.35,4.94,2.98,1.39,7.29,4.83,10.44,7.35.37.3.71.57,1.02.81Z" fill="currentColor"></path>
-                </g>
-
-                <g id="shoulders" className="hidden">
-                  <ellipse id="hover-2" data-name="hover" cx="441.13" cy="261.13" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse id="hover" cx="219.33" cy="261.13" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse cx="441.13" cy="261.13" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                  <ellipse cx="219.33" cy="261.13" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                </g>
-                <g id="elbow" className="hidden">
-                  <ellipse id="hover-3" data-name="hover" cx="118.6" cy="412.77" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse id="hover-7" data-name="hover" cx="541.86" cy="412.77" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse cx="541.86" cy="412.77" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                  <ellipse cx="118.6" cy="412.77" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                </g>
-                <g id="wrist" className="hidden">
-                  <ellipse id="hover-4" data-name="hover" cx="42.41" cy="531.02" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse id="hover-8" data-name="hover" cx="618.05" cy="531.02" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse cx="618.05" cy="531.02" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                  <ellipse cx="42.41" cy="531.02" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                </g>
-                <g id="hips" className="hidden">
-                  <ellipse id="hover-6" data-name="hover" cx="412.75" cy="523.37" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse id="hover-5" data-name="hover" cx="247.71" cy="523.37" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse cx="412.75" cy="523.37" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                  <ellipse cx="247.71" cy="523.37" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                </g>
-                <g id="knees" className="hidden">
-                  <ellipse id="hover-10" data-name="hover" cx="419.37" cy="874.7" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse id="hover-9" data-name="hover" cx="241.09" cy="874.7" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse cx="419.37" cy="874.7" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                  <ellipse cx="241.09" cy="874.7" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                </g>
-                <g id="ankles" className="hidden">
-                  <ellipse id="hover-11" data-name="hover" cx="221.14" cy="1105.65" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse id="hover-12" data-name="hover" cx="439.32" cy="1105.65" rx="24.71" ry="25.24" fill="url(#jointradial)" opacity="1" strokeWidth="0"></ellipse>
-                  <ellipse cx="439.32" cy="1105.65" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                  <ellipse cx="221.14" cy="1105.65" rx="12.04" ry="12.3" fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.46"></ellipse>
-                </g>
-        </svg>
-                  </div>
-                ) : (
-                  <BackMuscleMap
-                    selected={undefined}
-                    onMuscleClick={addMuscle}
-                    dimmed={false}
-                  />
-                )
-              ) : (
-                <div className="w-full rounded-xl border bg-muted/10 p-3 overflow-auto">
-                  <FemaleMuscleMap
-                    view={viewMode}
-                    selected={undefined}
-                    onMuscleClick={addMuscle}
-                    dimmed={false}
-                  />
-                </div>
-              )}
+                  <svg className="muscleSvg w-full max-w-[350px] mx-auto h-auto" viewBox="0 0 660.46 1206.46" fill="none" xmlns="http://www.w3.org/2000/svg" onClick={(e) => {
+                    const g = (e.target as Element).closest("g.bodymap");
+                    if (g?.id) addMuscle(g.id);
+                  }}>
+                    {/* SVG Content - IMPORTANT: Replace this comment with your full SVG paths from previous code */}
+                    <g id="calves" className="bodymap"><path d="M502.8,1183.5c-.68,1.05-1.86,1.29-2.74,1.31-.93.02-1.69.81-1.69,1.77,0,.38-.14,1.54-.78,2.18-.39.38-.97.56-1.75.53-.8-.04-1.51.52-1.72,1.32,0,.03-.6,2.33-2.27,3.3-.86.51-1.88.59-3.12.24-.69-.19-1.44.07-1.86.67-.02.03-1.86,2.61-4.39,2.9-1.39.17-2.76-.38-4.19-1.68-.68-.62-1.71-.58-2.35.08-.04.04-4.49,4.53-10.15,3.77-4.52-.61-8.73-4.34-12.51-11.09-.21-.39-.58-.69-1.02-.81-.57-.17-14.2-4.29-13.15-17.37.18-5.53-4.76-8.41-11.01-12.05l-.97-.57c-5.92-3.45-9.83-5.73-6.12-27.69.89-7.14-.42-14.69-.48-15-.11-.62-.33-1.05-.9-1.25-.42-.36-3.52-3.52-2.29-17.55,1.51-17.34,2.94-33.72-17.75-101.36-1.11-3.85-2.68-6.08-4.18-8.24-4.08-5.83-8.31-11.86-2.32-56.42,2.35-21.34,3.14-29.8,2.5-34.69,6.67,6.59,14.23,10.26,21.63,10.26h.34c8.38-.13,15.5-4.85,20.06-13.29,4.38-8.1,7.01-11.48,12.38-13.17.31.97.72 2.16 1.23 3.63,5.67 16.3 20.73 59.59 8.3 131.92,0 .05 0 .1-.02.15-.7 7.93-1.67 16.17-2.6 24.14-2.43 20.85-4.73 40.55-2.42 53.28,1.72 10.5 2.43 14.98 2.6 20.5,0 .15.03.3.07.45,1.34 4.55 8.23 15.73 12.79 23.12,1.33 2.14 2.46 4 3.13 5.14.8 1.37 1.22 2.38 1.59 3.25,1.09 2.59 1.89 4.14 6.89 8.26.9.74 1.83 1.49 2.8 2.26,6.46 5.2 13.78 11.1 17.75 20.07,1.41 3.47 1.65 6.21.69 7.71Z" fill="currentColor"></path><path d="M265.06,986.92c-1.51,2.16-3.08,4.4-4.18,8.22-20.71,67.67-19.28,84.05-17.76,101.38,1.22,14.03-1.87,17.2-2.29,17.55-.56.2-.79.63-.9,1.25-.05.31-1.37,7.86-.47,15.08,3.7,21.87-.21,24.15-6.13,27.61l-.98.57c-6.25,3.64-11.18,6.51-10.99,12.13,1.04,12.99-12.58,17.12-13.16,17.28-.44.12-.8.42-1.02.81-3.78,6.75-7.99,10.47-12.51,11.09-5.67.76-10.1-3.72-10.15-3.77-.63-.66-1.67-.7-2.35-.08-1.42,1.29-2.8,1.84-4.18,1.68-2.53-.29-4.39-2.88-4.41-2.9-.42-.6-1.15-.87-1.85-.67-1.25.35-2.28.27-3.13-.24-1.67-.98-2.27-3.28-2.27-3.3-.2-.8-.91-1.36-1.72-1.33-.79.03-1.36-.15-1.75-.53-.64-.64-.78-1.79-.78-2.17,0-.96-.74-1.76-1.68-1.77-.88-.02-2.07-.26-2.75-1.31-.96-1.5-.72-4.24.67-7.66,4-9.02,11.31-14.92,17.78-20.12.96-.77,1.89-1.52,2.79-2.26,5-4.13,5.8-5.67,6.89-8.26.37-.88.79-1.88,1.59-3.25.67-1.15,1.81-2.99,3.12-5.13,4.56-7.4,11.46-18.58,12.8-23.13.04-.15.07-.3.07-.45.17-5.52.88-10,2.6-20.47,2.31-12.77,0-32.47-2.42-53.32-.93-7.96-1.9-16.21-2.6-24.14,0-.05,0-.1-.02-.15-12.43-72.33,2.63-115.62,8.3-131.92.51-1.47.92-2.66,1.23-3.63,5.38,1.69,8,5.06,12.39,13.17,4.55,8.44,11.67,13.16,20.05,13.29h.35c7.39,0,14.95-3.67,21.62-10.27-.64,4.9.15,13.37,2.5,34.74,5.99,44.51,1.77,50.55-2.31,56.38Z" fill="currentColor"></path></g><g id="quads" className="bodymap"><path d="M452.4,783.8s0,.06-.02.09c0,.02,0,.04,0,.06-.8,3.72-1.52,7.5-2.22,11.15-3.01,15.71-5.86,30.55-13.07,34.21-2.93,1.49-6.55,1.09-11.09-1.18-2.16-1.08-4.06-1.25-5.66-.47-3.13,1.52-4.12,5.95-5.38,11.57-2.08,9.29-4.43,19.83-16.56,20.04h-.25c-22.01,0-29.18-50.54-29.24-51.05,0-.05-.02-.1-.03-.14-2.46-18.26-6.39-36.59-11.76-54.7-1.1-3.72-2.91-8.81-5.01-14.71-6.53-18.38-16.39-46.18-17.75-68.65-.11-3.62-.17-6.84-.23-9.67-.15-7.05-.24-11.52-.79-14.17,14.83-2.06,21.68-20.6,33.8-62.45,13.65-47.17,49.14-60.08,62.35-63.31,2.7,21.79,6.16,45.47,8.19,53.68.14.55.33,1.32.59,2.31,9.41,36.36,27.37,122.24,14.14,207.42Z" fill="currentColor"></path><path d="M327.13,646.17c-.55,2.65-.64,7.12-.79,14.17-.05,2.83-.12 6.06-.22 9.62-1.36,22.53-11.23,50.32-17.75,68.7-2.1,5.9-3.9,11-5.01,14.71-5.37,18.13-9.32,36.48-11.77,54.76,0,.03-.02.05-.02.08-.08.52-7.24,51.05-29.25,51.05h-.25c-12.12-.21-14.48-10.74-16.56-20.04-1.26-5.61-2.25-10.04-5.38-11.57-1.59-.78-3.49-.61-5.66.47-4.54,2.27-8.16,2.66-11.09,1.18-7.21-3.66-10.06-18.5-13.07-34.21-.71-3.71-1.44-7.54-2.26-11.3v-.03c-13.22-85.17,4.75-171.04,14.15-207.39.26-.99.45-1.76.59-2.31,2.03-8.2,5.5-31.89,8.2-53.68,13.22,3.23,48.69,16.15,62.34,63.31,12.12,41.86,18.97,60.39,33.8,62.45Z" fill="currentColor"></path></g><g id="abdominals" className="bodymap" fill="currentColor"><path d="M385.82,350.44c-2.32-5.36-9.35-9.32-16.39-12.32-.03-.02-.05-.03-.08-.03-1.6-.57-3.18-1.2-4.75-1.9-.03,0-.06-.02-.09-.04-10.51-3.96-23.74-6.74-29.44-2.69-1.99,1.42-2.95,3.62-2.95,6.73,0,.97-.77,1.75-1.71,1.75-.06,0-.12,0-.17,0-.06,0-.12,0-.18,0-.94,0-1.71-.78-1.71-1.75,0-3.11-.97-5.32-2.95-6.73-5.7-4.06-18.93-1.27-29.44,2.69-.03.02-.06.03-.09.04-1.57.7-3.15,1.33-4.75,1.9-.03.02-.07.03-.11.04-7.03,3-14.03,6.96-16.36,12.31-1.47,3.38-.66,6.05.81,10.88,1.22,4.02,2.84,9.3,3.56,17.09,0,0,0,.03,0,.04.11.8.17,1.63.21,2.49.03.67.08,1.35.1,2.06.1,2.61.04,3.85-.03,5.54-.09,1.82-.21,4.31-.15,9.95.09,11.41,2.3,60.52,4.34,93.24,3.28,52.64,34.75,92.8,46.58,92.8.06,0,.12,0,.18,0,.05,0,.11,0,.17,0,11.83,0,43.3-40.16,46.58-92.8,2.05-32.73,4.24-81.84,4.34-93.24.05-5.64-.07-8.13-.15-9.95-.08-1.7-.14-2.93-.03-5.54.03-.71.07-1.39.1-2.06.03-.87.09-1.7.21-2.49,0-.02,0-.04,0-.04.73-7.79,2.34-13.07,3.56-17.09,1.47-4.83,2.28-7.5.81-10.88ZM332.12,571.92c0,.97-.77,1.75-1.71,1.75h-.35c-.94,0-1.71-.78-1.71-1.75v-67.35c0-.96.77-1.75,1.71-1.75h.35c.94,0,1.71.79,1.71,1.75v67.35ZM361.89,479.09c-5.77-.12-20.94,1.39-26.17,2.61-2.83.66-3.58,3.45-3.77,7.75.05,1.27.05,2.54.05,3.74v.79c0,.96-.77,1.75-1.71,1.75h-.11c-.94,0-1.71-.79-1.71-1.75v-.79c0-1.21,0-2.47.05-3.74-.19-4.29-.94-7.09-3.76-7.75-5.24-1.22-20.4-2.73-26.18-2.61h-.03c-.93,0-1.69-.75-1.71-1.7-.02-.97.73-1.77,1.68-1.79,6.09-.13,21.47,1.41,27,2.69,2.28.53,3.77,1.79,4.73,3.46.95-1.67,2.44-2.93,4.72-3.46,5.54-1.29,20.94-2.82,27-2.69.95.03,1.69.82,1.68,1.79-.02.96-.81,1.77-1.75,1.7ZM369.89,472.83c-5.48.19-9.3.47-12.68.72-4.2.31-7.74.56-12.89.56-1.67,0-3.5-.03-5.59-.09-4.64-.35-7.15-1.87-8.5-5.2-1.34,3.33-3.83,4.84-8.43,5.19-2.13.06-4,.1-5.7.1-5.14,0-8.67-.26-12.86-.56-3.38-.24-7.2-.52-12.68-.72-.94-.04-1.69-.85-1.65-1.81.03-.97.8-1.73,1.77-1.69,5.54.2,9.39.48,12.8.73,5.48.39,9.8.71,18.14.46,5.19-.4,6.72-1.24,6.72-17.55,0-.96.77-1.75,1.71-1.75.06,0,.12,0,.18,0,.05,0,.11,0,.17,0,.94,0,1.71.79,1.71,1.75,0,16.31,1.52,17.15,6.79,17.55,8.27.24,12.59-.07,18.06-.46,3.41-.24,7.26-.52,12.8-.73h.06c.92,0,1.68.74,1.71,1.69.03.96-.71,1.77-1.65,1.81ZM298.34,426.66c5.55-.66,14.83-1.75,23.1-1.63,4.85.07,7.43,2,8.8,4.75,1.36-2.74,3.93-4.68,8.79-4.75,8.27-.11,17.55.98,23.1,1.63.94.11,1.62.98,1.51,1.94-.11.96-.97,1.64-1.9,1.54-5.47-.65-14.61-1.73-22.66-1.62-5.95.08-6.95,3.1-6.95,12.13,0,.97-.77,1.75-1.71,1.75-.06,0-.12,0-.17,0-.06,0-.12,0-.18,0-.94,0-1.71-.78-1.71-1.75,0-9.03-1-12.06-6.95-12.13-8.03-.11-17.2.97-22.66,1.62-.93.11-1.79-.58-1.9-1.54-.1-.96.56-1.83,1.51-1.94ZM371.36,425.01l-1.44.03c-3.47.06-6.9.11-10.21.11-11.14,0-21.01-.65-26.98-4.11-1.08-.62-1.89-1.43-2.5-2.4-.62.96-1.43,1.77-2.51,2.4-5.97,3.46-15.84,4.11-26.98,4.11-3.31,0-6.73-.05-10.21-.11l-1.44-.03c-.94,0-1.69-.8-1.69-1.77.02-.95.78-1.72,1.71-1.72h.03l1.44.03c14.67.24,28.5.48,35.44-3.54,1.7-.99,2.32-3.08,2.47-6.24-.08-1.48-.05-3.05,0-4.7-.02-.52-.03-1.08-.05-1.64-.06-1.77-.13-3.58-.13-5.5,0-.96.77-1.75,1.71-1.75.06,0,.12,0,.18,0,.05,0,.11,0,.17,0,.94,0,1.71.79,1.71,1.75,0,1.91-.06,3.74-.13,5.5-.02.52-.03,1.02-.04,1.5.05,1.73.08,3.39,0,4.94.17,3.1.79,5.17,2.47,6.15,6.94,4.02,20.78,3.79,35.44,3.54l1.44-.03h.03c.93,0,1.69.77,1.71,1.72,0,.97-.74,1.77-1.69,1.77ZM298.11,377.35l1.21-.32c5.42-1.47,14.52-3.92,22.23-2.57,4.77.83,7.32,2.92,8.69,5.58,1.36-2.66,3.92-4.75,8.68-5.58,7.72-1.35,16.8,1.1,22.23,2.57l1.21.32c.92.24,1.47,1.2,1.23,2.13-.24.94-1.17,1.49-2.09,1.25l-1.22-.32c-5.16-1.4-13.79-3.72-20.78-2.51-6.27,1.09-7.38,4.37-7.38,10.86,0,.96-.77,1.75-1.71,1.75-.06,0-.12,0-.17,0-.06,0-.12,0-.18,0-.94,0-1.71-.79-1.71-1.75,0-6.49-1.1-9.77-7.38-10.86-6.99-1.22-15.62,1.12-20.78,2.51l-1.22.32c-.92.24-1.85-.31-2.09-1.25-.23-.94.32-1.89,1.23-2.13ZM375.7,377.49c-.21.76-.9,1.26-1.64,1.26-.15,0-.32-.02-.48-.07-13.9-4.14-23.32-6.63-37.09-6.36-3.26-.02-5.15-1.85-6.25-4.72-1.1,2.87-2.99,4.7-6.23,4.72-13.79-.28-23.22,2.22-37.12,6.36-.16.05-.33.07-.48.07-.74,0-1.43-.5-1.64-1.26-.27-.93.26-1.9,1.16-2.17,14.22-4.23,23.88-6.78,38.11-6.5,4.01-.02,4.31-6.78,4.31-17.11,0-.97.77-1.75,1.71-1.75.06,0,.12,0,.18,0,.05,0,.11,0,.17,0,.94,0,1.71.78,1.71,1.75,0,10.32.3,17.09,4.35,17.11,14.19-.29,23.85,2.26,38.07,6.5.91.27,1.43,1.24,1.16,2.17Z" fill="currentColor"></path></g><g id="obliques" className="bodymap"><path d="M272.8,406.06c-2.74,15.58-5.85,33.23-3.49,49.66,4.83,33.57-6.55,48.85-11.65,53.86-6.22,6.09-16.8,8.99-26.23,7.31,1.27-10.42,2.32-20.17,2.91-27.28.42-5.01,1.09-10.04,1.79-15.35,2.58-19.47,5.24-39.6-4.39-59.14-19.23-37.82-24.33-61.62-25.32-67.11,1.13-3.44,1.99-6.98,2.58-10.55.92-5.82,3.02-19.11-1.38-29.2,2.28,2.19,4.33,4.6,6.29,7.03,1.18,1.46,2.4,2.87,3.68,4.21,10.16,11.56,22.09,22.06,32.62,31.32,13.18,11.59,24.56,21.61,25.39,27.78,0,.05.02.11.02.16.08.83.15,1.69.2,2.58,0,.06,0,.12,0,.19.18,6.35-1.32,14.88-3.02,24.53Z" fill="currentColor"></path><path d="M426.13,489.61c.6,7.11,1.65,16.86,2.91,27.28-9.43,1.68-20.01-1.22-26.23-7.31-5.11-5.01-16.47-20.29-11.65-53.86,2.36-16.44-.74-34.09-3.49-49.66-1.7-9.65-3.2-18.18-3.02-24.53,0-.07,0-.13,0-.19.05-.89.12-1.75.2-2.58,0-.05,0-.11.02-.16.84-6.17,12.22-16.19,25.39-27.78,10.5-9.23,22.37-19.69,32.5-31.19,1.33-1.39,2.59-2.83,3.81-4.34,1.96-2.42,4-4.83,6.27-7.02-4.4,10.09-2.29,23.37-1.36,29.19.57,3.57,1.44,7.12,2.58,10.57-1,5.53-6.13,29.33-25.33,67.12-9.62,19.52-6.96,39.65-4.38,59.11.7,5.32,1.37,10.34,1.79,15.35Z" fill="currentColor" strokeWidth="0"></path></g><g id="hands" className="bodymap"><path d="M641.72,606.51c-.72-3.08-1.76-4.39-3.21-6.2-1.2-1.5-2.6-3.25-4-6.33.39,3.69,1.45,5.88,2.44,7.89,1.11,2.27,2.25,4.62,2.18,8.39-.07,3.27.15,5.48.38,7.62.33,3.14.62,6.1-.21,11.37-.3,1.91-.05,3.3.75,4.16.73.78,1.89,1.09,2.88,1.21,0-1.21.15-2.5.39-3.88,1.61-9.13,1.28-10.51.27-14.63-.51-2.08-1.2-4.91-1.87-9.61Z" fill="currentColor"></path><path d="M655.51,598.27c-.58-4.99-.72-7.9-.82-10.02q-.21-4.45-5.12-14.28l-.18-.36c-6.84-13.19-9.99-23.35-12.78-32.31-1.45-4.67-2.85-9.18-4.69-13.83-1.93,5.8-5.47,10.35-9.99,12.65-2.37,1.21-5.09,1.81-8.01,1.81-2.11,0-4.34-.31-6.58-.95.85,2.46,1.09,4.63.17,6.03-4.68,6.58-2.36,14.08.2,17.27,2.83,3.53,4.31,8.29,5.46,17.55.27,3.06.39,5.9.5,8.64.51,11.95,1.24,16.45,6.93,16.34,1.02-.03,1.84-.44,2.59-1.3,3.93-4.54,3.47-18.56,2.97-23.58-.06-.57.15-1.13.57-1.49.42-.38.99-.52,1.52-.39.19.05,4.63,1.19,7.36,6.91.04.09.08.18.1.27,1.84,6.32,3.76,8.72,5.45,10.85,1.55,1.93,3,3.77,3.91,7.68,0,.05.02.1.03.15.65,4.56,1.3,7.22,1.81,9.35,1.07,4.41,1.51,6.24-.22,16.09-.32,1.82-.42,3.43-.28,4.81.16,1.79.7,3.21,1.62,4.23,1.26,1.43,3.05,1.84,4.21,1.97,1.89-6.82,4.46-16.62,4.59-18.79l.02-.22c.21-3.33.56-8.92-1.34-25.07Z" fill="currentColor"></path><path d="M18.73,606.51c-.68,4.69-1.37,7.54-1.87,9.61-.99,4.13-1.33,5.52.27,14.63.24,1.38.38,2.68.38,3.88.99-.11,2.15-.43,2.88-1.21.8-.86,1.05-2.26.75-4.16-.84-5.27-.53-8.24-.21-11.37.22-2.14.44-4.35.38-7.62-.08-3.78,1.06-6.12,2.17-8.39.98-2.01,2.04-4.2,2.44-7.89-1.39,3.08-2.8,4.83-4,6.33-1.45,1.81-2.49,3.12-3.21,6.2Z" fill="currentColor" strokeWidth="0"></path><path d="M52.99,547.07c-.92-1.42-.69-3.62.16-6.09-2.25.64-4.48.96-6.61.96-2.91,0-5.64-.6-8.01-1.81-4.53-2.3-8.08-6.87-9.99-12.67-1.83,4.66-3.23,9.18-4.69,13.85-2.79,8.96-5.95,19.12-12.8,32.34l-.16.33q-4.91,9.83-5.12,14.28c-.1,2.12-.23,5.03-.82,10.02-1.91,16.16-1.55,21.74-1.34,25.08l.02.21c.14,2.17,2.7,11.97,4.6,18.79,1.15-.12,2.94-.54,4.21-1.97.87-.98,1.4-2.33,1.59-4.01,0-.08,0-.15.02-.23.14-1.38.03-2.98-.28-4.8-1.74-9.85-1.29-11.68-.22-16.09.52-2.12,1.16-4.77,1.81-9.35,0-.05.02-.1.03-.15.91-3.91,2.37-5.74,3.91-7.68,1.69-2.12,3.61-4.53,5.45-10.85.03-.09.06-.18.1-.27,2.73-5.72,7.17-6.85,7.36-6.91.54-.13,1.1.02,1.52.39.42.37.63.93.57,1.49-.5,5.02-.96,19.04,2.97,23.58.75.87,1.57,1.28,2.6,1.3,5.73.12,6.43-4.39,6.92-16.34.12-2.74.24-5.58.5-8.57,1.16-9.34,2.64-14.09,5.47-17.62,2.56-3.19,4.88-10.69.23-17.22Z" fill="currentColor"></path></g><g id="forearms" className="bodymap"><path d="M629.69,522.22c-1.13,6.78-4.65,12.42-9.28,14.77-4.03,2.05-9.46,1.91-15.01-.38-2.21-4.21-5.19-8.37-6.61-10.26-.04-.04-.08-.1-.13-.14-8.02-8.58-14.46-13.59-20.69-18.45-8.62-6.72-16.75-13.06-28.61-28.19-12.92-16.47-16.63-24.46-20.56-32.91-2.42-5.19-4.92-10.57-9.56-18.2-.02-.03-.03-.05-.05-.08-2.17-3.18-6.32-8.99-11.24-15.81,7.32,5.22,14.13,7.31,19.91,7.31,3.54,0,6.69-.78,9.33-2.12,5.52-2.78,12.21-9.26,12.71-24.32.21-6.44-.72-13.94-2.78-22.46.3.72.6,1.44.91,2.18,2.49,6.15,5.69,9.56,11.5,15.77,4.14,4.41,9.81,10.46,17.68,20.13,13.13,16.15,26.59,50.24,37.42,77.64,4.49,11.37,8.74,22.12,12.4,30.19.02.04.03.08.05.11.97,1.78,1.83,3.52,2.62,5.24Z" fill="currentColor"></path><path d="M152.48,412.57c-4.91,6.81-9.05,12.62-11.22,15.8-.02.03-.03.05-.05.08-4.64,7.64-7.14,13.01-9.56,18.2-3.93,8.45-7.64,16.44-20.56,32.91-11.86,15.13-20,21.47-28.61,28.19-6.23,4.86-12.66,9.88-20.69,18.45-.04.04-.09.1-.13.14-1.41,1.89-4.39,6.04-6.6,10.26-5.54,2.29-10.98,2.44-15.02.38-4.63-2.35-8.15-7.98-9.28-14.77.79-1.71,1.65-3.45,2.62-5.24.02-.04.04-.08.06-.11,3.65-8.06,7.9-18.81,12.39-30.19,10.82-27.4,24.28-61.49,37.42-77.64,7.86-9.67,13.54-15.72,17.68-20.13,5.81-6.21,9.02-9.63,11.5-15.75.3-.71.58-1.41.88-2.1-2.04,8.48-2.96,15.95-2.75,22.36.49,15.06,7.18,21.54,12.7,24.32,2.64,1.34,5.79,2.12,9.33,2.12,5.77,0,12.57-2.09,19.88-7.29Z" fill="currentColor"></path></g><g id="biceps" className="bodymap"><path d="M535.68,414.61c-8.57,4.33-23.53,1.71-39.79-18.59-.02-.02-.03-.04-.05-.06-9.71-13.16-19.05-25.49-21.34-27.65-.5-.47-1.05-.99-1.66-1.54-4.5-4.14-11.31-10.39-15.31-20.4-.14-.35-.37-.62-.67-.8,0,0,0,0,0,0-.86-2.84-1.54-5.75-2.01-8.66-1.1-6.96-4.03-25.45,5.81-33.63,5.53-4.61,13.2-4.37,21.33-4.14.92.03,2.27.1,3.94.29,0,0,.03,0,.03,0,.04,0,.09.02.13.02.02,0,.03,0,.05,0,.03,0,.06,0,.09,0,2.54.31,5.82.88,9.54,1.98,0,0,0,0,.02,0,.14.06.29.11.45.12.02,0,.03,0,.03,0,2.49.75,5.18,1.73,7.97,3.01,3.26,1.5,6.39,3.29,9.32,5.29.45.54.96,1.08,1.5,1.67,2.81,3.02,7.61,8.17,16.01,24.38,0,.02.02.03.02.04,0,0,0,.02.02.03,25.45,57.59,13.79,73.98,4.57,78.62Z" fill="currentColor"></path><path d="M205.61,336.89c-.47,2.92-1.15,5.82-2.01,8.66-.3.19-.54.47-.68.82-4,10-10.81,16.26-15.31,20.4-.61.55-1.16,1.07-1.66,1.54-2.28,2.16-11.63,14.49-21.34,27.65-.02.02-.03.04-.05.06-16.26,20.3-31.21,22.91-39.79,18.59-9.21-4.64-20.86-21.02,4.53-78.53,0,0,0,0,0-.02l.03-.05c8.42-16.29,13.23-21.44,16.04-24.47.55-.59,1.05-1.13,1.51-1.68,2.92-2,6.05-3.78,9.3-5.27,2.82-1.29,5.55-2.28,8.08-3.03.11-.04.23-.07.35-.11,0,0,.02,0,.03,0,3.72-1.08,7.02-1.67,9.57-1.98.03,0,.07,0,.1,0h.02c.05,0,.11,0,.16-.02.02,0,.03,0,.04,0h0c1.67-.19,2.99-.26,3.91-.29,8.13-.24,15.8-.47,21.33,4.14,9.84,8.18,6.91,26.67,5.81,33.62Z" fill="currentColor"></path></g><g id="front-shoulders" className="bodymap"><path d="M510.6,303.91c-1.61-.91-3.25-1.75-4.94-2.53-7.64-3.49-14.56-4.88-19.19-5.42-7.44-1.87-13.18-4.12-16.62-6.5-12.81-8.87-22.9-20.97-27.79-26.83-4.59-5.52-7.95-10.07-10.92-14.08-6.46-8.74-11.12-15.05-22.12-22.2-5.2-3.37-11.11-5.94-15.09-7.49,8.34-2.74,26.96-7.7,44.59-4.11.97.24,1.99.51,3.04.78,1.25.32,2.34.6,3.08.8.34.09.84.17,1.59.3,32.54,5.37,45.89,28.26,51.36,46.48.75,2.74,1.56,4.76,2.58,7.33,2.02,5.07,5.06,12.69,10.42,33.46Z" fill="currentColor"></path><path d="M266.59,218.87c-3.98,1.55-9.89,4.12-15.09,7.49-10.99,7.14-15.66,13.45-22.12,22.2-2.97,4.01-6.33,8.57-10.96,14.13-4.84,5.81-14.94,17.91-27.76,26.79-3.42,2.39-9.16,4.62-16.62,6.5,0,0-.03,0-.03,0-2.75.32-6.31.94-10.34,2.14-.11.03-.21.06-.32.1-2.66.79-5.53,1.83-8.5,3.18-1.69.77-3.34,1.62-4.95,2.53,5.37-20.76,8.41-28.39,10.43-33.47,1.02-2.56,1.82-4.59,2.57-7.29,5.48-18.25,18.83-41.15,51.37-46.52.75-.12,1.25-.21,1.59-.3.74-.2,1.83-.48,3.09-.8,1.06-.27,2.08-.53,3.06-.79.02,0,.04-.02.07-.02,17.61-3.55,36.17,1.39,44.49,4.14Z" fill="currentColor"></path></g><g id="chest" className="bodymap"><path d="M473.89,295.55c-14.9.39-23.27,9.22-29.96,17.52-.93,1.15-1.89,2.26-2.88,3.34-.09.06-.16.13-.23.22-.15.17-.28.32-.44.49-18.16,19.25-45.55,26.23-69.71,17.75-1.63-.69-3.27-1.34-4.89-1.95-9.36-4.2-17.52-10.41-24.23-18.47-6.08-7.31-9.44-16.78-9.44-26.7v-49.81c0-.72.19-17.59,26.62-20.16,15.4-1.49,24.1,1.14,28.77,2.55.26.08.5.16.74.22.04.02.09.04.12.04,0,0,.03,0,.03,0h.02c.05.02.1.04.15.05.17.06.36.12.54.17,2.64.92,11.16,4,18.08,8.5,10.48,6.8,14.75,12.59,21.23,21.35,2.99,4.06,6.39,8.65,11.08,14.28,4.95,5.94,15.25,18.28,28.44,27.42,1.61,1.12,3.6,2.19,5.96,3.18Z" fill="currentColor"></path><path d="M328.4,237.95v49.79c0,9.9-3.35,19.39-9.44,26.7-6.71,8.06-14.87,14.27-24.23,18.47-1.62.61-3.25,1.26-4.87,1.94-24.1,8.48-51.46,1.55-69.61-17.62-.19-.2-.37-.41-.55-.61-.08-.09-.15-.16-.24-.22-.98-1.08-1.94-2.19-2.87-3.34-6.69-8.3-15.07-17.13-29.96-17.52,2.36-1,4.35-2.06,5.95-3.18,13.19-9.14,23.49-21.48,28.48-27.46,4.65-5.59,8.04-10.18,11.04-14.24,6.48-8.76,10.75-14.55,21.23-21.35,6.92-4.49,15.44-7.58,18.08-8.5.18-.05.36-.11.54-.17.05,0,.1-.03.15-.05.03,0,.07-.02.09-.03.03,0,.06,0,.09-.03h0c.23-.06.48-.14.73-.22,4.66-1.42,13.36-4.05,28.77-2.55,26.44,2.57,26.63,19.44,26.62,20.19Z" fill="currentColor"></path></g><g id="traps" className="bodymap"><path d="M287.92,178.7v20.85c0,10-5.2,13.67-16.13,17.47-3.35-1.33-19.62-7.35-37.88-7.02.31-.25.64-.52,1.01-.81,3.15-2.52,7.46-5.96,10.44-7.35,1.96-.92,6.52-2.88,11.35-4.94,7.4-3.17,15.8-6.78,18.88-8.35,3.68-1.87,9.2-6.86,12.32-9.84Z" fill="currentColor"></path><path d="M426.68,210c-18.26-.34-34.53,5.69-37.89,7.02-10.92-3.79-16.12-7.47-16.12-17.47v-20.84c3.12,2.97,8.63,7.96,12.31,9.83,3.08,1.57,11.48,5.18,18.88,8.35,4.83,2.06,9.39,4.02,11.35,4.94,2.98,1.39,7.29,4.83,10.44,7.35.37.3.71.57,1.02.81Z" fill="currentColor"></path></g>
+                  </svg>
+                ) : <BackMuscleMap selected={undefined} onMuscleClick={addMuscle} dimmed={false} />
+              ) : <FemaleMuscleMap view={viewMode} selected={undefined} onMuscleClick={addMuscle} dimmed={false} />}
             </CardContent>
           </Card>
         </div>
       </div>
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex gap-4 bg-background/90 backdrop-blur-sm border rounded-full px-8 py-4 shadow-lg z-50">
-        <Button variant="outline">معاينة</Button>
-        <Button size="lg" onClick={handleSave}>
-          Save Plan
-        </Button>
+
+{/* ... باقي الكود في الأعلى كما هو ... */}
+
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex gap-4 bg-background/95 backdrop-blur border rounded-full px-8 py-4 shadow-2xl z-50">
+        <Button variant="outline" onClick={() => console.log(plan)}>Preview</Button>
+        <Button size="lg" className="px-10" onClick={handleSave}>Save Final Plan</Button>
       </div>
+
+      {/* 👇 الزر الأسود يظهر الآن دائماً 👇 */}
+      <Button
+        className="fixed bottom-6 left-100 z-50 bg-black hover:bg-gray-800 text-white rounded-full h-12 px-6 shadow-2xl flex items-center gap-2 transition-transform hover:scale-105"
+        onClick={() => setShowCreator(false)}
+      >
+        <LayoutList className="w-5 h-5" />
+        <span className="font-bold">
+          {plans.length > 0 ? `My Plans (${plans.length})` : "Back to Plans"}
+        </span>
+      </Button>
+
     </MainLayout>
   );
 }
