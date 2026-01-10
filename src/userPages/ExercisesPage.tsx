@@ -487,8 +487,8 @@ const toggleEquipmentUI = (k: EquipmentUIKey) => {
                   </div>
                 </>
               ) : (
-                <BackMuscleMap
-                  selected={selected}
+<BackMuscleMap
+                  selected={selected ?? undefined}
                   onMuscleClick={setSelected}
                   dimmed={dimMode}
                   svgRef={backSvgRef}
@@ -498,7 +498,7 @@ const toggleEquipmentUI = (k: EquipmentUIKey) => {
               viewMode === "front" ? (
                 <div className="w-full rounded-xl border bg-muted/10 p-3 overflow-auto">
                   <FemaleMuscleMap
-                    selected={selected}
+                    selected={selected ?? undefined}
                     onMuscleClick={setSelected}
                     dimmed={dimMode}
                     svgRef={svgRef}
@@ -508,7 +508,7 @@ const toggleEquipmentUI = (k: EquipmentUIKey) => {
               ) : (
                 <div className="w-full rounded-xl border bg-muted/10 p-3 overflow-auto">
                   <FemaleMuscleMap
-                    selected={selected}
+                    selected={selected ?? undefined}
                     onMuscleClick={setSelected}
                     dimmed={dimMode}
                     svgRef={svgRef}
