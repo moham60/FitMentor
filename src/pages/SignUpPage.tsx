@@ -23,7 +23,7 @@ const signUpSchema = z.object({
 
 const SignUpPage = () => {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signUp,signInWithGoogle } = useAuth();
   const { theme, toggleTheme } = useTheme();
   
   const [accountType, setAccountType] = useState<'user' | 'coach'>('user');
@@ -36,7 +36,17 @@ const SignUpPage = () => {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
+  /**handlers */
+  const handleGoogleSignUp =async () => {
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) toast.error(error.message);
+      
+    }
+    catch(err) {
+         toast.error('Failed to connect to Google');
+      }
+  }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
@@ -274,7 +284,7 @@ const SignUpPage = () => {
           </div>
 
           <div className="flex gap-4">
-            <Button variant="outline" className="flex-1 h-12 rounded-xl">
+            <Button onClick={handleGoogleSignUp} variant="outline" className="flex-1 h-12 rounded-xl">
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.27 0 3.198 2.698 1.24 6.65l4.026 3.115Z"/>
                 <path fill="#34A853" d="M16.04 18.013c-1.09.703-2.474 1.078-4.04 1.078a7.077 7.077 0 0 1-6.723-4.823l-4.04 3.067A11.965 11.965 0 0 0 12 24c2.933 0 5.735-1.043 7.834-3l-3.793-2.987Z"/>
