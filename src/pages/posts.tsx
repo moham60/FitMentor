@@ -33,6 +33,7 @@ type CoachPost = {
   user_id: string;
   coachName: string;
   coachAvatar?: string; // may be http url OR path in storage
+  authorAccountType?: string | null;
   createdAt: string;
   content: string;
   imageUrl?: string; // may be http url OR path in storage OR youtube link
@@ -147,6 +148,7 @@ export default function Posts() {
   // ✅ Signed urls maps (fix avatar + private media)
   const [avatarSignedMap, setAvatarSignedMap] = React.useState<Record<string, string>>({});
   const [postMediaSignedMap, setPostMediaSignedMap] = React.useState<Record<string, string>>({});
+  const [authorTypeMap, setAuthorTypeMap] = React.useState<Record<string, string>>({});
 
   // --- Logic ---
   const loadPosts = React.useCallback(async () => {
@@ -211,6 +213,7 @@ export default function Posts() {
         user_id: p.user_id,
         coachName: p.author_full_name ?? "User",
         coachAvatar: p.author_avatar_url ?? "",
+        authorAccountType: null,
         createdAt: p.created_at
           ? new Date(p.created_at).toLocaleString("ar-EG", {
               hour: "2-digit",
@@ -229,6 +232,36 @@ export default function Posts() {
         visibility,
       };
     });
+
+    // ✅ Fetch authors account_type (coach/user) so avatar click goes to correct profile route
+    try {
+      const authorIds = Array.from(new Set(rows.map((r: any) => r.user_id).filter(Boolean)));
+      if (authorIds.length) {
+        const { data: profRows, error: profErr } = await supabase
+          .from("profiles")
+          .select("user_id, account_type")
+          .in("user_id", authorIds);
+        if (profErr) {
+          console.warn("profiles fetch error:", profErr);
+          setAuthorTypeMap({});
+        } else {
+          const m: Record<string, string> = {};
+          for (const pr of profRows ?? []) {
+            const uid = (pr as any).user_id as string;
+            const t = ((pr as any).account_type as string | null) ?? "user";
+            if (uid) m[uid] = t;
+          }
+          setAuthorTypeMap(m);
+          // also populate in posts array (optional)
+          for (const mp of mapped) mp.authorAccountType = m[mp.user_id] ?? null;
+        }
+      } else {
+        setAuthorTypeMap({});
+      }
+    } catch (e) {
+      console.warn("author types fetch failed:", e);
+      setAuthorTypeMap({});
+    }
 
     // ✅ Signed URLs for avatars (when stored as path)
     try {
@@ -750,9 +783,15 @@ const submitPost = async () => {
                     <CardHeader className="space-y-4 p-5">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          <Avatar  title="go to Profile" onClick={() => {
-                            navigate(`/userProfile/${p.user_id}`)
-                          }} className="h-12 w-12 border-2 border-background shadow-sm">
+                          <Avatar
+                            title="go to Profile"
+                            onClick={() => {
+                              const t = authorTypeMap[p.user_id] ?? p.authorAccountType ?? "user";
+                              if (t === "coach") navigate(`/coachProfile/${p.user_id}`);
+                              else navigate(`/userProfile/${p.user_id}`);
+                            }}
+                            className="h-12 w-12 border-2 border-background shadow-sm"
+                          >
                             <AvatarImage className="cursor-pointer" src={coachAvatarSrc} />
                             <AvatarFallback className="bg-primary/10 text-primary font-bold">
                               {(p.coachName ?? "U")

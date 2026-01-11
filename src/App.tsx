@@ -30,6 +30,7 @@ import EarningsPage from "./coachPages/earnings";
 import PlansPage from "./coachPages/plans";
 import PostsPage from "./pages/posts";
 import UserProfilePage from "./pages/UserProfile";
+import CoachProfilePage from "./pages/CoachProfile";
 
 const queryClient = new QueryClient();
 
@@ -206,6 +207,18 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/coachProfile/:id"
+        element={
+          <ProtectedRoute>
+            <OnboardingGate>
+              <CoachProfilePage />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/exercises"
         element={
