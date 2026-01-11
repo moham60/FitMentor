@@ -1,9 +1,14 @@
+import { useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTheme } from '@/contexts/ThemeContext';
+// ✅ FIX 1: Import supabase directly to use 'updateUser' for password reset
+import { supabase } from '@/integrations/supabase/client'; 
+import { toast } from 'sonner';
 import { 
   Sun,
   Moon,
@@ -12,12 +17,69 @@ import {
   Lock,
   Trash2,
   Download,
-  HelpCircle
+  HelpCircle,
+  Loader2
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
 
 const SettingsPage = () => {
   const { theme, toggleTheme } = useTheme();
+  
+  // State for Password Reset
+  const [isResetOpen, setIsResetOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleUpdatePassword = async () => {
+    // 1. Basic Validation
+    if (!newPassword || !confirmPassword) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // 2. Supabase Update Call
+      const { error } = await supabase.auth.updateUser({ 
+        password: newPassword 
+      });
+
+      if (error) throw error;
+
+      toast.success('Password updated successfully');
+      setIsResetOpen(false);
+      setNewPassword('');
+      setConfirmPassword('');
+
+    } catch (error) {
+      // ✅ FIX 2: Handle TypeScript 'unknown' error type
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <MainLayout 
@@ -75,24 +137,10 @@ const SettingsPage = () => {
               </div>
               <Switch defaultChecked />
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-foreground">Meal Reminders</p>
-                <p className="text-sm text-muted-foreground">Remind me to log meals</p>
-              </div>
-              <Switch defaultChecked />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-foreground">Workout Reminders</p>
-                <p className="text-sm text-muted-foreground">Daily workout notifications</p>
-              </div>
-              <Switch />
-            </div>
           </CardContent>
         </Card>
 
-        {/* Privacy */}
+        {/* Privacy & Security */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -108,16 +156,65 @@ const SettingsPage = () => {
               </div>
               <Switch />
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-foreground">Share Progress</p>
-                <p className="text-sm text-muted-foreground">Share achievements on leaderboard</p>
-              </div>
-              <Switch />
-            </div>
-            <Button variant="outline" className="w-full mt-2">
-              Change Password
-            </Button>
+            
+            {/* Password Reset Dialog */}
+            <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full mt-2">
+                  Change Password
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Change Password</DialogTitle>
+                  <DialogDescription>
+                    Enter your new password below.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input 
+                      id="new-password" 
+                      type="password" 
+                      placeholder="••••••••"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm Password</Label>
+                    <Input 
+                      id="confirm-password" 
+                      type="password" 
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="flex flex-col sm:flex-row gap-2">
+                  <DialogClose asChild>
+                    <Button variant="ghost" type="button">Cancel</Button>
+                  </DialogClose>
+                  <Button 
+                    onClick={handleUpdatePassword} 
+                    disabled={isLoading}
+                    className="bg-primary text-primary-foreground"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Password'
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
           </CardContent>
         </Card>
 
@@ -153,7 +250,7 @@ const SettingsPage = () => {
               <Download className="w-4 h-4" />
               Export My Data
             </Button>
-            <Button variant="outline" className="w-full gap-2 text-destructive hover:text-destructive">
+            <Button variant="outline" className="w-full gap-2 text-destructive hover:text-destructive hover:bg-destructive/10">
               <Trash2 className="w-4 h-4" />
               Delete Account
             </Button>
@@ -169,10 +266,9 @@ const SettingsPage = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button variant="ghost" className="w-full justify-start">FAQ</Button>
-            <Button variant="ghost" className="w-full justify-start">Contact Support</Button>
-            <Button variant="ghost" className="w-full justify-start">Terms of Service</Button>
-            <Button variant="ghost" className="w-full justify-start">Privacy Policy</Button>
+            <Button variant="ghost" className="w-full justify-start h-auto py-3">FAQ</Button>
+            <Button variant="ghost" className="w-full justify-start h-auto py-3">Contact Support</Button>
+            <Button variant="ghost" className="w-full justify-start h-auto py-3">Privacy Policy</Button>
           </CardContent>
         </Card>
 

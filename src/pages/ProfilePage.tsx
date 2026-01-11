@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,11 @@ const ProfilePage = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
+  // Avatar upload + display
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
@@ -75,6 +80,38 @@ const ProfilePage = () => {
 
     run();
   }, [user?.id, navigate]);
+
+  // Generate an image URL that works for both public URLs and private buckets.
+  useEffect(() => {
+    const run = async () => {
+      const avatar = profile?.avatar_url;
+      if (!avatar) {
+        setAvatarSrc(null);
+        return;
+      }
+
+      // If we already stored a full URL, use it directly.
+      if (avatar.startsWith('http')) {
+        setAvatarSrc(avatar);
+        return;
+      }
+
+      // Otherwise treat it as a storage path and generate a signed URL.
+      const { data, error } = await supabase.storage
+        .from('avatars')
+        .createSignedUrl(avatar, 60 * 60);
+
+      if (error) {
+        console.error('Error creating signed URL for avatar:', error);
+        setAvatarSrc(null);
+        return;
+      }
+
+      setAvatarSrc(data.signedUrl);
+    };
+
+    run();
+  }, [profile?.avatar_url]);
 
   const displayName = useMemo(() => {
     return (
@@ -111,6 +148,70 @@ const ProfilePage = () => {
     toast.message('You can update your profile info in onboarding for now.');
   };
 
+  const triggerAvatarPicker = () => {
+    if (uploadingAvatar) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarSelected = async (e: ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      // allow selecting the same file again
+      e.target.value = '';
+
+      if (!user?.id) {
+        toast.error('You must be signed in.');
+        return;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file.');
+        return;
+      }
+
+      const maxSizeMb = 5;
+      if (file.size > maxSizeMb * 1024 * 1024) {
+        toast.error(`Image is too large. Max ${maxSizeMb}MB.`);
+        return;
+      }
+
+      setUploadingAvatar(true);
+
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const filePath = `${user.id}/avatar-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          upsert: true,
+          cacheControl: '3600',
+          contentType: file.type,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Store the storage path in the DB.
+      // This works for both public buckets (you can getPublicUrl later)
+      // and private buckets (we use createSignedUrl at render time).
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: filePath })
+        .eq('user_id', user.id);
+
+      if (dbError) throw dbError;
+
+      setProfile((prev) => (prev ? { ...prev, avatar_url: filePath } : prev));
+      toast.success('Profile photo updated!');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message ?? 'Failed to upload avatar.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   return (
     <MainLayout title="Profile" subtitle="Manage your account">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -120,19 +221,41 @@ const ProfilePage = () => {
             <div className="flex flex-col items-center">
               {/* Avatar */}
               <div className="relative mb-4">
-                <div className="w-28 h-28 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-glow">
-                  <span className="text-4xl font-bold text-primary-foreground">
-                    {avatarLetter}
-                  </span>
+                <div className="w-28 h-28 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-glow overflow-hidden">
+                  {avatarSrc ? (
+                    <img
+                      src={avatarSrc}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-4xl font-bold text-primary-foreground">
+                      {avatarLetter}
+                    </span>
+                  )}
                 </div>
                 <button
                   type="button"
                   aria-label="Change profile picture"
                   className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center shadow-md hover:bg-muted transition-colors"
-                  onClick={() => toast.message('Avatar upload not implemented yet.')}
+                  onClick={triggerAvatarPicker}
                 >
                   <Camera className="w-5 h-5 text-foreground" />
                 </button>
+
+                {/* A11y: form control must have a label */}
+                <label htmlFor="avatar-upload" className="sr-only">
+                  Profile photo
+                </label>
+                <input
+                  id="avatar-upload"
+                  title="Upload profile photo"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarSelected}
+                />
               </div>
 
               {/* Name & Email */}
@@ -164,6 +287,10 @@ const ProfilePage = () => {
 
               {loadingProfile && (
                 <p className="text-xs text-muted-foreground mt-3">Loading profile...</p>
+              )}
+
+              {uploadingAvatar && (
+                <p className="text-xs text-muted-foreground mt-2">Uploading photo...</p>
               )}
             </div>
           </CardContent>

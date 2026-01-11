@@ -9,23 +9,60 @@ export default function AuthCallbackPage() {
 
   React.useEffect(() => {
     const run = async () => {
-      // تأكد session اتعملت بعد الرجوع من جوجل
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
       if (error || !session?.user) {
         navigate("/signin", { replace: true });
         return;
       }
 
-      const uid = session.user.id;
+      const user = session.user;
 
-      // ✅ لو أول مرة (لسه ناقص الاسم/نوع الحساب) -> GoogleOnboarding
-      const newUser = await isNewUser(uid);
+      // ✅ If user completed pre-onboarding BEFORE sign-up, sync metadata -> profiles after verification/login.
+      if ((user.user_metadata as any)?.onboarding_completed) {
+        const m = (user.user_metadata ?? {}) as Record<string, any>;
+
+        const payload = {
+          user_id: user.id,
+          full_name: m.full_name ?? null,
+          account_type: m.account_type ?? null,
+          gender: m.gender ?? null,
+          age: m.age ?? null,
+          height_cm: m.height_cm ?? null,
+          weight_kg: m.weight_kg ?? null,
+          activity_level: m.activity_level ?? null,
+          goal: m.goal ?? null,
+          bmr: m.bmr ?? null,
+          tdee: m.tdee ?? null,
+          calories_maintain: m.calories_maintain ?? null,
+          calories_mild_loss: m.calories_mild_loss ?? null,
+          calories_loss: m.calories_loss ?? null,
+          calories_extreme_loss: m.calories_extreme_loss ?? null,
+          calories_gain: m.calories_gain ?? null,
+          daily_calories: m.daily_calories ?? null,
+          updated_at: new Date().toISOString(),
+        };
+
+        try {
+          await supabase.from("profiles").upsert(payload, { onConflict: "user_id" });
+        } catch {
+          // Best-effort: ignore schema mismatch errors
+        }
+
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+
+      // ✅ Existing flow: for Google OAuth, route to google-onboarding if missing name/type in profiles
+      const newUser = await isNewUser(user.id);
       if (newUser) {
         navigate("/google-onboarding", { replace: true });
         return;
       }
 
-      // ✅ لو مش جديد -> دخله عادي
       navigate("/dashboard", { replace: true });
     };
 

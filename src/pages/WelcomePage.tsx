@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, TrendingUp, Target, Sparkles, Activity, Star, Dumbbell, Flame, Heart, Zap } from 'lucide-react';
+import { ArrowRight, TrendingUp, Target, Sparkles, Activity, Star, Dumbbell, Flame, Heart, Zap, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,227 +8,232 @@ import { toast } from 'sonner';
 import { Sun, Moon } from 'lucide-react';
 import heroWorkout from '@/assets/hero-workout.jpg';
 
+// --- Custom Brand SVGs for sleek look ---
+// Google "G" official-style icon
+const GoogleIcon = ({ size = 24 }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 533.5 544.3"
+    width={size}
+    height={size}
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path
+      fill="#4285F4"
+      d="M533.5 278.4c0-18.4-1.5-36.1-4.3-53.3H272v100.9h146.9c-6.3 34-25 62.8-53.3 82v68.2h86.2c50.5-46.5 81.7-115.1 81.7-197.8z"
+    />
+    <path
+      fill="#34A853"
+      d="M272 544.3c72.6 0 133.6-24.1 178.1-65.6l-86.2-68.2c-24 16.1-54.7 25.6-91.9 25.6-70.1 0-129.5-47.3-150.7-110.9H32.1v69.6C76.3 482.1 167.6 544.3 272 544.3z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M121.3 325.2c-10.8-32-10.8-66.6 0-98.6V157H32.1c-37.4 74.8-37.4 163.5 0 238.3l89.2-70.1z"
+    />
+    <path
+      fill="#EA4335"
+      d="M272 107.7c39.5-.6 77.6 14 106.7 40.9l79.3-79.3C409.5 24.7 344.7-1 272 0 167.6 0 76.3 62.2 32.1 157l89.2 69.6C142.5 155 201.9 107.7 272 107.7z"
+    />
+  </svg>
+);
+
+
+const FacebookIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" style={{ fill: '#1877F2' }}>
+        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+    </svg>
+);
+
+const AppleIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+        <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+    </svg>
+);
+
+
 const WelcomePage = () => {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle } = useAuth(); // Note: You'll need similar functions for FB/Apple later
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true);
-    try {
-      const { error } = await signInWithGoogle();
-      if (error) {
-        toast.error(error.message || 'Failed to connect to Google');
-      }
-    } catch (err) {
-      toast.error('Failed to connect to Google');
-    } finally {
-      setGoogleLoading(false);
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Generalized handler for social sign-ins (placeholder for now)
+  const handleSocialSignIn = async (provider) => {
+    toast.info(`Connecting to ${provider}...`);
+    if (provider === 'google') {
+         setGoogleLoading(true);
+        try {
+            const { error } = await signInWithGoogle();
+            if (error) throw error;
+        } catch (err) {
+            toast.error('Failed to connect to Google');
+        } finally {
+            setGoogleLoading(false);
+        }
     }
+    // Add FB/Apple logic here later
   };
 
-  const features = [
-    {
-      icon: TrendingUp,
-      title: 'Professional Training',
-      description: 'Custom workouts with continuous progress tracking',
-    },
-    {
-      icon: Target,
-      title: 'Smart Nutrition Plans',
-      description: 'Accurate calorie and macro calculations',
-    },
-    {
-      icon: Sparkles,
-      title: 'AI Assistant',
-      description: 'Instant answers and personalized tips 24/7',
-    },
-    {
-      icon: Activity,
-      title: 'Comprehensive Tracking',
-      description: 'Monitor your weight and measurements precisely',
-    },
-  ];
 
-  const stats = [
-    { value: '4.9', label: 'User Rating', icon: Star },
-    { value: '10K+', label: 'Meals Logged', icon: Flame },
-    { value: '5K+', label: 'Active Users', icon: Heart },
+  const features = [
+    { icon: TrendingUp, title: 'AI Progress Tracking', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { icon: Target, title: 'Smart Nutrition', color: 'text-green-500', bg: 'bg-green-500/10' },
+    { icon: Sparkles, title: 'AI Coach', color: 'text-purple-500', bg: 'bg-purple-500/10' }
   ];
 
   return (
-    <div className="min-h-screen  bg-gradient-hero relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-3xl" />
+    <div className="min-h-screen bg-background text-foreground relative overflow-x-hidden selection:bg-primary/30">
+      
+      {/* --- Background & Nav remain the same as before --- */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-accent/20 rounded-full blur-[120px] animate-pulse delay-1000" />
       </div>
 
-      {/* Theme Toggle */}
-      <button
-        onClick={toggleTheme}
-        className="fixed top-5 right-5 z-50 p-3 rounded-full bg-card/80 backdrop-blur-md border-2 border-border shadow-lg hover:scale-110 transition-all duration-300 flex items-center gap-2"
-      >
-        {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5 text-yellow-400" />}
-      </button>
-
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-4 lg:p-8">
-        <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
-          {/* Left Side - Auth Card */}
-          <div className="w-full max-w-md order-2 lg:order-1">
-            <div className="bg-card/90 backdrop-blur-xl rounded-3xl p-8 lg:p-12 shadow-2xl animate-fade-in border border-border/50">
-              {/* Logo in card */}
-              <div className="flex items-center justify-center gap-3 mb-6">
-                <div className="w-14 h-14 bg-gradient-primary rounded-2xl flex items-center justify-center shadow-glow">
-                  <Dumbbell className="w-8 h-8 text-white" />
+      <nav className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled ? 'bg-background/80 backdrop-blur-md border-b border-border/50 py-4' : 'py-6 bg-transparent'}`}>
+        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/60 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                    <Dumbbell className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <span className="text-2xl font-display font-bold text-foreground">FitMintor</span>
-                  <p className="text-xs text-muted-foreground">Your Fitness Companion</p>
-                </div>
-              </div>
-
-              <h2 className="text-2xl lg:text-3xl font-display font-bold text-center text-foreground mb-2">
-                Start Your Journey Now
-              </h2>
-              <p className="text-muted-foreground text-center mb-8 text-sm">
-                Join thousands of users who achieved their goals
-              </p>
-
-              <div className="space-y-4">
-                <Button
-                  onClick={() => navigate('/signup')}
-                  className="w-full h-14 bg-gradient-primary hover:opacity-90 text-primary-foreground text-base font-semibold rounded-xl shadow-glow transition-all duration-300 hover:scale-[1.02] gap-2"
-                >
-                  Create New Account
-                  <ArrowRight className="w-5 h-5" />
-                </Button>
-
-                <Button
-                  onClick={() => navigate('/signin')}
-                  variant="outline"
-                  className="w-full h-14 text-base font-semibold rounded-xl border-2 hover:bg-primary/5 transition-all duration-300"
-                >
-                  I Already Have an Account
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-4 my-8">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground">Or continue with</span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-
-              <div className="flex gap-3">
-                <Button variant="outline" className="flex-1 h-12 rounded-xl hover:scale-105 transition-transform">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                  </svg>
-                </Button>
-                <Button variant="outline" className="flex-1 h-12 rounded-xl hover:scale-105 transition-transform">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex-1 h-12 rounded-xl hover:scale-105 transition-transform"
-                  onClick={handleGoogleSignIn}
-                  disabled={googleLoading}
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.27 0 3.198 2.698 1.24 6.65l4.026 3.115Z"/>
-                    <path fill="#34A853" d="M16.04 18.013c-1.09.703-2.474 1.078-4.04 1.078a7.077 7.077 0 0 1-6.723-4.823l-4.04 3.067A11.965 11.965 0 0 0 12 24c2.933 0 5.735-1.043 7.834-3l-3.793-2.987Z"/>
-                    <path fill="#4A90E2" d="M19.834 21c2.195-2.048 3.62-5.096 3.62-9 0-.71-.109-1.473-.272-2.182H12v4.637h6.436c-.317 1.559-1.17 2.766-2.395 3.558L19.834 21Z"/>
-                    <path fill="#FBBC05" d="M5.277 14.268A7.12 7.12 0 0 1 4.909 12c0-.782.125-1.533.357-2.235L1.24 6.65A11.934 11.934 0 0 0 0 12c0 1.92.445 3.73 1.237 5.335l4.04-3.067Z"/>
-                  </svg>
-                </Button>
-              </div>
-
-              <p className="text-xs text-center text-muted-foreground mt-8">
-                By continuing, you agree to our{' '}
-                <a href="#" className="text-primary hover:underline">Terms of Service</a>
-                {' '}and{' '}
-                <a href="#" className="text-primary hover:underline">Privacy Policy</a>
-              </p>
+                <span className="text-xl font-display font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+                    FitMintor
+                </span>
             </div>
-          </div>
+            <button onClick={toggleTheme} className="p-2.5 rounded-full bg-secondary/50 hover:bg-secondary backdrop-blur-sm border border-border transition-all duration-300 hover:scale-105 active:scale-95">
+                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5 text-yellow-400" />}
+            </button>
+        </div>
+      </nav>
 
-          {/* Right Side - Hero Content */}
-          <div className="flex-1 text-center lg:text-left text-primary-foreground order-1 lg:order-2">
-            {/* Hero Image */}
-            <div className="relative mb-8 hidden lg:block">
-              <div className="absolute -inset-4 bg-gradient-primary/20 rounded-3xl blur-2xl" />
-              <img 
-                src={heroWorkout} 
-                alt="Fitness" 
-                className="relative rounded-3xl shadow-2xl w-full max-w-lg mx-auto lg:mx-0 object-cover h-64 animate-fade-in"
-              />
-              {/* Floating Stats */}
-              <div className="absolute -bottom-6 -left-6 bg-card/90 backdrop-blur-md rounded-2xl p-4 shadow-xl animate-fade-in" style={{ animationDelay: '0.5s' }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-primary rounded-xl flex items-center justify-center">
-                    <Zap className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">+85%</p>
-                    <p className="text-xs text-muted-foreground">Fitness Improvement</p>
-                  </div>
+      {/* --- Main Content --- */}
+      <div className="relative z-10 container max-w-7xl mx-auto px-4 pt-32 pb-12 min-h-screen flex flex-col lg:flex-row items-center gap-16">
+        
+        {/* Left Side: Auth & Value Prop */}
+        <div className="flex-1 w-full max-w-xl space-y-8 animate-fade-in-up">
+            
+            {/* Headline Section (Same as before) */}
+            <div className="space-y-6 text-center lg:text-left">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium animate-bounce-slow">
+                    <Sparkles className="w-4 h-4" />
+                    <span>#1 AI Fitness Companion</span>
                 </div>
-              </div>
+                <h1 className="text-4xl sm:text-5xl lg:text-7xl font-display font-bold leading-[1.1] tracking-tight">
+                    Fitness Evolved <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-500 to-accent">
+                        Powered by AI
+                    </span>
+                </h1>
+                <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mx-auto lg:mx-0">
+                    Experience the future of personal training. FitMintor builds adaptive workouts and nutrition plans tailored specifically to your DNA and goals.
+                </p>
             </div>
 
-            <h1 className="text-4xl lg:text-6xl font-display font-bold mb-6 animate-fade-in">
-              Transform Your Body
-              <br />
-              <span className="bg-gradient-to-r from-primary-foreground to-primary-foreground/70 bg-clip-text text-transparent">
-                With the Power of AI
-              </span>
-            </h1>
-            <p className="text-lg lg:text-xl text-primary-foreground/80 mb-12 max-w-lg mx-auto lg:mx-0 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-              A complete platform to achieve your fitness goals with AI-powered support
-            </p>
+            {/* --- UPDATED AUTH CARD --- */}
+            <div className="bg-card/40 backdrop-blur-xl border border-white/10 dark:border-white/5 rounded-3xl p-6 sm:p-8 shadow-2xl ring-1 ring-black/5">
+                <div className="space-y-6">
+                    {/* Primary Action */}
+                    <Button
+                        onClick={() => navigate('/signup')}
+                        className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-semibold rounded-2xl shadow-lg shadow-primary/25 transition-all duration-300 hover:translate-y-[-2px] group"
+                    >
+                        Create Account
+                        <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </Button>
 
-            {/* Features Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
-              {features.map((feature, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-4 p-4 rounded-2xl bg-primary-foreground/10 backdrop-blur-sm border border-primary-foreground/20 hover:bg-primary-foreground/20 transition-all duration-300 hover:scale-105 animate-fade-in"
-                  style={{ animationDelay: `${0.3 + index * 0.1}s` }}
-                >
-                  <div className="w-12 h-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center flex-shrink-0">
-                    <feature.icon className="w-6 h-6" />
-                  </div>
-                  <div className="text-left">
-                    <h3 className="font-semibold text-sm">{feature.title}</h3>
-                    <p className="text-xs text-primary-foreground/70">{feature.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    {/* Divider */}
+                    <div className="relative flex items-center py-2">
+                        <div className="flex-grow border-t border-border/50"></div>
+                        <span className="flex-shrink-0 mx-4 text-xs text-muted-foreground uppercase tracking-wider font-medium">Or continue with</span>
+                        <div className="flex-grow border-t border-border/50"></div>
+                    </div>
 
-            {/* Stats */}
-            <div className="flex items-center justify-center lg:justify-start gap-8 lg:gap-12">
-              {stats.map((stat, index) => (
-                <div 
-                  key={index} 
-                  className="text-center animate-fade-in" 
-                  style={{ animationDelay: `${0.7 + index * 0.1}s` }}
-                >
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <stat.icon className="w-5 h-5 fill-current" />
-                    <span className="text-3xl font-bold">{stat.value}</span>
-                  </div>
-                  <p className="text-sm text-primary-foreground/70">{stat.label}</p>
+                    {/* Social Icons Row - The new aesthetic part */}
+                    <div className="grid grid-cols-3 gap-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => handleSocialSignIn('google')}
+                            disabled={googleLoading}
+                            className="h-14 rounded-2xl border-border/60 bg-background/50 hover:bg-background/80 hover:scale-105 transition-all duration-300"
+                        >
+                             <GoogleIcon />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => handleSocialSignIn('facebook')}
+                            className="h-14 rounded-2xl border-border/60 bg-background/50 hover:bg-background/80 hover:scale-105 transition-all duration-300"
+                        >
+                            <FacebookIcon />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => handleSocialSignIn('apple')}
+                            className="h-14 rounded-2xl border-border/60 bg-background/50 hover:bg-background/80 hover:scale-105 transition-all duration-300"
+                        >
+                            <AppleIcon />
+                        </Button>
+                    </div>
+
+                    {/* Secondary Action */}
+                    <Button
+                        variant="ghost"
+                        onClick={() => navigate('/signin')}
+                        className="w-full h-12 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                    >
+                        Already have an account? <span className="font-semibold ml-1 text-primary">Sign In</span>
+                    </Button>
                 </div>
-              ))}
             </div>
-          </div>
+        </div>
+
+        {/* Right Side (Phone Mockup) remains the same */}
+        <div className="flex-1 relative hidden lg:block">
+            <div className="relative w-[380px] mx-auto z-10 transform transition-transform hover:scale-[1.02] duration-500">
+                <div className="absolute -inset-1 bg-gradient-to-b from-primary/30 to-purple-600/30 rounded-[3rem] blur-sm"></div>
+                <div className="relative bg-background border-[8px] border-slate-900 dark:border-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl aspect-[9/19]">
+                    <img src={heroWorkout} alt="App Screenshot" className="w-full h-full object-cover opacity-90" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                    <div className="absolute bottom-8 left-6 right-6 text-white">
+                        <div className="flex items-center gap-2 mb-2">
+                             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                             <span className="text-xs font-medium uppercase tracking-wider">Workout Active</span>
+                        </div>
+                        <h3 className="text-2xl font-bold mb-1">Full Body Crush</h3>
+                        <p className="text-white/80 text-sm">45 mins • High Intensity</p>
+                    </div>
+                </div>
+
+                {/* Floating Widgets */}
+                <div className="absolute top-20 -right-20 bg-card/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-border/50 animate-[float_4s_ease-in-out_infinite]">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center"><Heart className="w-5 h-5 text-red-500 fill-current" /></div>
+                        <div><p className="text-xs text-muted-foreground">New Post</p><p className="text-lg font-bold">50 Likes</p></div>
+                    </div>
+                </div>
+                <div className="absolute bottom-32 -left-16 bg-card/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-border/50 animate-[float_5s_ease-in-out_infinite_1s]">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center"><Flame className="w-5 h-5 text-orange-500" /></div>
+                        <div><p className="text-xs text-muted-foreground">Calories</p><p className="text-lg font-bold">840 kcal</p></div>
+                    </div>
+                </div>
+            </div>
         </div>
       </div>
+      
+      {/* Footer styles remain */}
+      <style>{`
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        .animate-bounce-slow { animation: bounce 3s infinite; }
+      `}</style>
     </div>
   );
 };

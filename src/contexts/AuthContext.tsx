@@ -11,7 +11,9 @@ interface AuthContextType {
     email: string,
     password: string,
     fullName: string,
-    accountType: "user" | "coach"
+    accountType: "user" | "coach",
+    extraData?: Record<string, unknown>,
+    emailRedirectTo?: string
   ) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
@@ -27,15 +29,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1) Get current session on load
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    // 2) Listen to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -53,20 +57,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: string,
     password: string,
     fullName: string,
-    accountType: "user" | "coach"
+    accountType: "user" | "coach",
+    extraData?: Record<string, unknown>,
+    emailRedirectTo?: string
   ) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: emailRedirectTo ?? `${window.location.origin}/auth/callback`,
         data: {
           full_name: fullName,
           account_type: accountType,
+          ...(extraData ?? {}),
         },
       },
     });
 
-    return { error };
+    return { error: error as AuthError | null };
   };
 
   /**
@@ -74,17 +82,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Important: you must add this URL in Supabase -> Auth -> URL Configuration -> Redirect URLs
    * e.g. http://localhost:8080/google-onboarding
    */
-const signInWithGoogle = async () => {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
-    },
-  });
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
 
-  return { error: error as AuthError | null };
-};
+    return { error: error as AuthError | null };
+  };
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   const updateUserMetadata = async (metadata: Record<string, any>) => {
     const { error } = await supabase.auth.updateUser({ data: metadata });
@@ -94,7 +105,7 @@ const signInWithGoogle = async () => {
   /**
    * ✅ Better "new user" check:
    * بعض المشاريع بتعمل profile تلقائي (trigger) => فـ data موجودة
-   * لكن full_name / account_type بيكونوا فاضيين => ده يعتبر "لسه جديد"
+   * لكن full_name / account_type بيكونوا فاضيين
    */
   const isNewUser = async (userId: string) => {
     const { data, error } = await supabase
@@ -105,7 +116,7 @@ const signInWithGoogle = async () => {
 
     if (error) {
       console.error('Error checking if user is new:', error);
-      return true; // assume new if can't check
+      return true;
     }
 
     if (!data) return true;
@@ -114,10 +125,6 @@ const signInWithGoogle = async () => {
     const typeOk = typeof data.account_type === 'string' && data.account_type.trim().length > 0;
 
     return !(nameOk && typeOk);
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
   };
 
   return (
@@ -140,9 +147,7 @@ const signInWithGoogle = async () => {
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };

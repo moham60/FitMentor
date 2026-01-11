@@ -8,32 +8,27 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+
 // Pages
 import WelcomePage from "./pages/WelcomePage";
 import SignUpPage from "./pages/SignUpPage";
+import PreOnboardingPage from "./pages/PreOnboardingPage";
 import SignInPage from "./pages/SignInPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import GoogleOnboardingPage from "./pages/GoogleOnboardingPage";
+import AuthCallbackPage from "./pages/AuthCallbackPage";
 import DashboardPage from "./pages/DashboardPage";
+import ExercisesPage from "./userPages/ExercisesPage";
 import NutritionPage from "./userPages/NutritionPage";
 import WorkoutsPage from "./userPages/WorkoutsPage";
 import InBodyPage from "./userPages/InBodyPage";
-import AIAssistantPage from "./pages/AIAssistantPage";
-import ExercisesPage from "./userPages/ExercisesPage";
-import GoalsPage from "./pages/GoalsPage";
-import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
-import NotFound from "./pages/NotFound";
-import Posts from "./coachPages/posts";
-import Clients from "./coachPages/clients";
-import Plans from "./coachPages/plans";
-import Earnings from "./coachPages/earnings";
-
-// ✅ NEW: Auth Callback Page
-import AuthCallbackPage from "./pages/AuthCallbackPage"; // عدّل المسار لو مختلف
-
-// Types
-import { UserRole } from "./types/user";
+import ProfilePage from "./pages/ProfilePage";
+import AIAssistantPage from "./pages/AIAssistantPage";
+import ClientsPage from "./coachPages/clients";
+import EarningsPage from "./coachPages/earnings";
+import PlansPage from "./coachPages/plans";
+import PostsPage from "./coachPages/posts";
 
 const queryClient = new QueryClient();
 
@@ -48,106 +43,73 @@ const FullPageLoader = () => (
 
 /**
  * 1) ProtectedRoute:
- * يمنع الوصول للمسارات إلا إذا كان المستخدم مسجل دخول.
- * يدعم أيضا التحقق من نوع الحساب (coach أو user).
+ * يمنع الوصول للمسارات إلا إذا كان المستخدم مسجل دخول
  */
-const ProtectedRoute = ({ children, role }: { children: React.ReactNode; role?: UserRole }) => {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-
   if (loading) return <FullPageLoader />;
-
   if (!user) return <Navigate to="/" replace />;
-
-  const userAccountType = user?.user_metadata?.account_type || "user";
-  if (role && userAccountType !== role) return <Navigate to="/dashboard" replace />;
-
   return <>{children}</>;
-};
+}
 
 /**
- * 2) OnboardingGate:
- * - لو Google user ولسه الاسم/نوع الحساب مش متسجلين في profiles -> /google-onboarding
- * - لو بيانات fitness ناقصة -> /onboarding
- * - غير كده يسمح بدخول الصفحة
- *
- * IMPORTANT: هذا الجارد يستخدم فقط للصفحات "بعد تسجيل الدخول" مثل dashboard وباقي الصفحات،
- * ولا يستخدم لصفحة /google-onboarding أو /onboarding نفسها.
+ * 2) PublicRoute:
+ * يمنع الوصول لمسارات auth إذا كان المستخدم مسجل دخول بالفعل
  */
-const OnboardingGate = ({ children }: { children: React.ReactNode }) => {
+function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const [status, setStatus] = useState<"loading" | "google-setup" | "incomplete" | "complete">("loading");
+  if (loading) return <FullPageLoader />;
+  if (user) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
 
-  const isGoogleUser = useMemo(() => user?.app_metadata?.provider === "google", [user?.app_metadata?.provider]);
+/**
+ * Gate to enforce onboarding completion if needed
+ */
+function OnboardingGate({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
 
   useEffect(() => {
     const run = async () => {
-      if (!user?.id) {
-        // لو مش مسجل دخول، الجارد ده مش المفروض يشتغل أصلاً (ProtectedRoute هيمنع)
-        setStatus("complete");
-        return;
-      }
-
-      setStatus("loading");
+      if (!user) return;
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, account_type, daily_calories")
+        .select("user_id, gender, age, height_cm, weight_kg, activity_level, goal, daily_calories")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (error) {
-        // لو حصل مشكلة في القراءة، الأفضل ما نحبسش المستخدم في لوب
-        console.error("OnboardingGate profiles read error:", error);
-        setStatus("complete");
+        setNeedsOnboarding(true);
         return;
       }
 
-      const hasFullName = !!data?.full_name;
-      const hasAccountType = !!data?.account_type;
-
-      // ✅ أول مرة فقط لجوجل: لو الاسم/النوع ناقصين
-      if (isGoogleUser && (!hasFullName || !hasAccountType)) {
-        setStatus("google-setup");
+      // if profile row missing or required fields missing -> onboarding
+      if (!data) {
+        setNeedsOnboarding(true);
         return;
       }
 
-      // ✅ لو بيانات fitness ناقصة (مثلاً daily_calories مش متسجل)
-      if (!data?.daily_calories || !hasAccountType) {
-        setStatus("incomplete");
-        return;
-      }
+      const ok =
+        data.gender &&
+        data.age &&
+        data.height_cm &&
+        data.weight_kg &&
+        data.activity_level &&
+        data.goal &&
+        data.daily_calories;
 
-      setStatus("complete");
+      setNeedsOnboarding(!ok);
     };
 
     run();
-  }, [user?.id, isGoogleUser]);
+  }, [user?.id]);
 
-  if (loading || status === "loading") return <FullPageLoader />;
-
-  if (status === "google-setup") return <Navigate to="/google-onboarding" replace />;
-
-  if (status === "incomplete") return <Navigate to="/onboarding" replace />;
-
+  if (loading || needsOnboarding === null) return <FullPageLoader />;
+  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
   return <>{children}</>;
-};
-
-/**
- * 3) PublicRoute:
- * صفحات public (Welcome/Login/Signup)
- * لو المستخدم مسجل دخول بالفعل -> يروح dashboard (والجارد هناك هيتولى موضوع onboarding)
- */
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
-
-  if (loading) return <FullPageLoader />;
-
-  if (user) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return <>{children}</>;
-};
+}
 
 const AppRoutes = () => {
   return (
@@ -172,6 +134,15 @@ const AppRoutes = () => {
           </PublicRoute>
         }
       />
+      <Route
+        path="/pre-onboarding"
+        element={
+          <PublicRoute>
+            <PreOnboardingPage />
+          </PublicRoute>
+        }
+      />
+
       <Route
         path="/signin"
         element={
@@ -201,7 +172,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* Shared Protected Routes (with onboarding gate) */}
+      {/* Protected Routes */}
       <Route
         path="/dashboard"
         element={
@@ -214,35 +185,49 @@ const AppRoutes = () => {
       />
 
       <Route
-        path="/ai"
+        path="/exercises"
         element={
           <ProtectedRoute>
             <OnboardingGate>
-              <AIAssistantPage />
+              <ExercisesPage />
             </OnboardingGate>
           </ProtectedRoute>
         }
       />
+
       <Route
-        path="/goals"
+        path="/nutrition"
         element={
           <ProtectedRoute>
             <OnboardingGate>
-              <GoalsPage />
+              <NutritionPage />
             </OnboardingGate>
           </ProtectedRoute>
         }
       />
+
       <Route
-        path="/profile"
+        path="/workouts"
         element={
           <ProtectedRoute>
             <OnboardingGate>
-              <ProfilePage />
+              <WorkoutsPage />
             </OnboardingGate>
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/inbody"
+        element={
+          <ProtectedRoute>
+            <OnboardingGate>
+              <InBodyPage />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/settings"
         element={
@@ -254,109 +239,90 @@ const AppRoutes = () => {
         }
       />
 
-      {/* User Specific Routes */}
       <Route
-        path="/Exercises"
+        path="/profile"
         element={
-          <ProtectedRoute role="user">
+          <ProtectedRoute>
             <OnboardingGate>
-              <ExercisesPage />
-            </OnboardingGate>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/nutrition"
-        element={
-          <ProtectedRoute role="user">
-            <OnboardingGate>
-              <NutritionPage />
-            </OnboardingGate>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/workouts"
-        element={
-          <ProtectedRoute role="user">
-            <OnboardingGate>
-              <WorkoutsPage />
-            </OnboardingGate>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/inbody"
-        element={
-          <ProtectedRoute role="user">
-            <OnboardingGate>
-              <InBodyPage />
+              <ProfilePage />
             </OnboardingGate>
           </ProtectedRoute>
         }
       />
 
-      {/* Coach Specific Routes */}
       <Route
-        path="/Plans"
+        path="/ai-assistant"
         element={
-          <ProtectedRoute role="coach">
+          <ProtectedRoute>
             <OnboardingGate>
-              <Plans />
-            </OnboardingGate>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/Clients"
-        element={
-          <ProtectedRoute role="coach">
-            <OnboardingGate>
-              <Clients />
-            </OnboardingGate>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/Earnings"
-        element={
-          <ProtectedRoute role="coach">
-            <OnboardingGate>
-              <Earnings />
-            </OnboardingGate>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/Posts"
-        element={
-          <ProtectedRoute role="coach">
-            <OnboardingGate>
-              <Posts />
+              <AIAssistantPage />
             </OnboardingGate>
           </ProtectedRoute>
         }
       />
 
-      {/* 404 Page */}
-      <Route path="*" element={<NotFound />} />
+      {/* Coach Routes */}
+      <Route
+        path="/coach/clients"
+        element={
+          <ProtectedRoute>
+            <OnboardingGate>
+              <ClientsPage />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/coach/earnings"
+        element={
+          <ProtectedRoute>
+            <OnboardingGate>
+              <EarningsPage />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/coach/plans"
+        element={
+          <ProtectedRoute>
+            <OnboardingGate>
+              <PlansPage />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/coach/posts"
+        element={
+          <ProtectedRoute>
+            <OnboardingGate>
+              <PostsPage />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
+    <TooltipProvider>
+      <ThemeProvider>
+        <AuthProvider>
           <BrowserRouter>
             <AppRoutes />
           </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </ThemeProvider>
+
+          <Toaster />
+          <Sonner />
+        </AuthProvider>
+      </ThemeProvider>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

@@ -1,6 +1,7 @@
 import { Sun, Moon, Bell } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +14,9 @@ interface HeaderProps {
 const Header = ({ title, subtitle }: HeaderProps) => {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
+  const { profile } = useProfile();
   const [dailyCalories, setDailyCalories] = useState<number | null>(null);
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDailyCalories = async () => {
@@ -38,6 +41,36 @@ const Header = ({ title, subtitle }: HeaderProps) => {
 
     fetchDailyCalories();
   }, [user?.id]);
+
+  // Build a usable avatar image URL (supports public URL or private bucket path)
+  useEffect(() => {
+    const run = async () => {
+      const avatar = profile?.avatar_url || null;
+      if (!avatar) {
+        setAvatarSrc(null);
+        return;
+      }
+
+      if (avatar.startsWith('http')) {
+        setAvatarSrc(avatar);
+        return;
+      }
+
+      const { data, error } = await supabase.storage
+        .from('avatars')
+        .createSignedUrl(avatar, 60 * 60);
+
+      if (error) {
+        console.error('Error creating header avatar URL:', error);
+        setAvatarSrc(null);
+        return;
+      }
+
+      setAvatarSrc(data.signedUrl);
+    };
+
+    run();
+  }, [profile?.avatar_url]);
 
   return (
     <header className="sticky top-0 z-40 bg-card border-b border-border px-6 py-4 lg:px-8">
@@ -86,10 +119,18 @@ const Header = ({ title, subtitle }: HeaderProps) => {
 
           {/* User Avatar */}
           <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-muted rounded-xl">
-            <div className="w-9 h-9 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <span className="text-sm font-bold text-primary-foreground">
-                {user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0).toUpperCase() || 'U'}
-              </span>
+            <div className="w-9 h-9 rounded-lg bg-gradient-primary flex items-center justify-center overflow-hidden">
+              {avatarSrc ? (
+                <img
+                  src={avatarSrc}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-sm font-bold text-primary-foreground">
+                  {user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0).toUpperCase() || 'U'}
+                </span>
+              )}
             </div>
             <div className="hidden lg:block">
               <p className="text-sm font-medium text-foreground">
