@@ -143,7 +143,7 @@ export default function Plan() {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="flex-1">View</Button>
-                    <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => {
+                    <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-400" onClick={() => {
                         if(confirm("Delete this plan?")) setPlans(plans.filter((_, idx) => idx !== i))
                     }}>
                         <Trash2 className="w-4 h-4" />

@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { MdPostAdd, MdPublic, MdLockOutline, MdSearch, MdSort } from "react-icons/md";
 import { FaHeart, FaRegHeart, FaRegCommentDots, FaSpinner } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 // --- Types ---
 type CoachPost = {
@@ -117,7 +118,7 @@ export default function Posts() {
   const [tab, setTab] = React.useState<"all" | "coaches" | "public">("all");
   const [sort, setSort] = React.useState<"newest" | "popular">("newest");
   const [q, setQ] = React.useState("");
-
+  const navigate = useNavigate();
   const [selectedPostId, setSelectedPostId] = React.useState<string | null>(null);
 
   const [commentsOpen, setCommentsOpen] = React.useState(false);
@@ -749,8 +750,10 @@ const submitPost = async () => {
                     <CardHeader className="space-y-4 p-5">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
-                            <AvatarImage src={coachAvatarSrc} />
+                          <Avatar  title="go to Profile" onClick={() => {
+                            navigate(`/userProfile/${p.user_id}`)
+                          }} className="h-12 w-12 border-2 border-background shadow-sm">
+                            <AvatarImage className="cursor-pointer" src={coachAvatarSrc} />
                             <AvatarFallback className="bg-primary/10 text-primary font-bold">
                               {(p.coachName ?? "U")
                                 .split(" ")

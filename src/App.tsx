@@ -28,7 +28,8 @@ import AIAssistantPage from "./pages/AIAssistantPage";
 import ClientsPage from "./coachPages/clients";
 import EarningsPage from "./coachPages/earnings";
 import PlansPage from "./coachPages/plans";
-import PostsPage from "./coachPages/posts";
+import PostsPage from "./pages/posts";
+import UserProfilePage from "./pages/UserProfile";
 
 const queryClient = new QueryClient();
 
@@ -172,6 +173,18 @@ const AppRoutes = () => {
         }
       />
 
+      {/**shared  */}
+        <Route
+        path="/posts"
+        element={
+          <ProtectedRoute>
+            <OnboardingGate>
+              <PostsPage />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Protected Routes */}
       <Route
         path="/dashboard"
@@ -183,7 +196,16 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+      <Route
+        path="/userProfile/:id"
+        element={
+          <ProtectedRoute>
+             <OnboardingGate>
+              <UserProfilePage  />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/exercises"
         element={
@@ -260,7 +282,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+  
       {/* Coach Routes */}
       <Route
         path="/coach/clients"
@@ -292,16 +314,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/coach/posts"
-        element={
-          <ProtectedRoute>
-            <OnboardingGate>
-              <PostsPage />
-            </OnboardingGate>
-          </ProtectedRoute>
-        }
-      />
+    
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
