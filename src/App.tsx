@@ -31,6 +31,8 @@ import PlansPage from "./coachPages/plans";
 import PostsPage from "./pages/posts";
 import UserProfilePage from "./pages/UserProfile";
 import CoachProfilePage from "./pages/CoachProfile";
+import ChatPage from "./pages/ChatPage";
+import ChatNotificationsListener from "./components/chat/ChatNotificationsListener";
 
 const queryClient = new QueryClient();
 
@@ -198,6 +200,28 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/chat"
+        element={
+          <ProtectedRoute>
+            <OnboardingGate>
+              <ChatPage />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/chat/:id"
+        element={
+          <ProtectedRoute>
+            <OnboardingGate>
+              <ChatPage />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/userProfile/:id"
         element={
           <ProtectedRoute>
@@ -341,6 +365,7 @@ const App = () => (
       <ThemeProvider>
         <AuthProvider>
           <BrowserRouter>
+            <ChatNotificationsListener />
             <AppRoutes />
           </BrowserRouter>
 
