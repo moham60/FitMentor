@@ -1,17 +1,31 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner"; 
-import { FilePlus, Dumbbell, Trash2, LayoutList, ArrowLeft } from "lucide-react"; 
+import { FilePlus, Dumbbell, Trash2, LayoutList, Loader2 } from "lucide-react"; 
 import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Textarea } from "@/components/ui/textarea";
 import { BackMuscleMap } from "@/components/workout/BackMuscleMap";
 import { FemaleMuscleMap } from "@/components/workout/FemaleMuscleMap";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const createId = () => crypto.randomUUID();
+
+const EQUIPMENT_OPTIONS = [
+  "Barbell",
+  "Dumbbells",
+  "Bodyweight",
+  "Machine",
+  "Kettlebells",
+  "Cables",
+  "Band",
+] as const;
 
 const NAMES_AR: Record<string, string> = {
   calves: "Calves", quads: "Quadriceps", abdominals: "Abs", obliques: "Obliques",
@@ -22,21 +36,194 @@ const NAMES_AR: Record<string, string> = {
 
 type PlanMuscle = {
   id: string; muscleId: string; muscleName: string; exerciseCount: number;
-  sets: number; reps: string; order: number;
+  sets: number; reps: string; equipment: string; exerciseDescription: string; order: number;
 };
 
 type TrainingPlan = {
-  name: string; type: "basic" | "gold" | "premium"; muscles: PlanMuscle[];
+  id?: string;
+  name: string;
+  type: "basic" | "gold" | "premium";
+  imageUrl?: string;
+  muscles: PlanMuscle[];
 };
 
 export default function Plan() {
+  const { user } = useAuth();
   // --- States ---
   const [plans, setPlans] = useState<TrainingPlan[]>([]); 
+  const [loading, setLoading] = useState(true);
   const [showCreator, setShowCreator] = useState(false);
-  const [plan, setPlan] = useState<TrainingPlan>({ name: "", type: "gold", muscles: [] });
+  const [viewingPlan, setViewingPlan] = useState<TrainingPlan | null>(null);
+  const [plan, setPlan] = useState<TrainingPlan>({ name: "", type: "gold", imageUrl: "", muscles: [] });
   const [viewMode, setViewMode] = useState<"front" | "back">("front");
   const [isMale, setIsMale] = useState(true);
   const [nameError, setNameError] = useState("");
+  const [openExerciseDescriptions, setOpenExerciseDescriptions] = useState<Record<string, boolean>>({});
+  const [muscleExerciseImages, setMuscleExerciseImages] = useState<Record<string, string>>({});
+  const [planCardImages, setPlanCardImages] = useState<Record<string, string>>({});
+
+  // Load plans from database
+  useEffect(() => {
+    if (user?.id) {
+      loadPlans();
+    }
+  }, [user?.id]);
+
+  // Load thumbnails for plan cards (My Plans view)
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPlanCardImages = async () => {
+      try {
+        const entries = await Promise.all(
+          plans.map(async (p) => {
+            if (!p.id) return null;
+
+            const direct = p.imageUrl?.trim();
+            if (direct) return [p.id, direct] as const;
+
+            const firstMuscle = p.muscles?.[0];
+            if (!firstMuscle) return null;
+
+            let q = supabase
+              .from("exercise_library" as any)
+              .select("image_url")
+              .eq("muscle_group", firstMuscle.muscleId)
+              .limit(1);
+
+            if (firstMuscle.equipment) {
+              q = q.eq("equipment", firstMuscle.equipment);
+            }
+
+            const { data } = await q;
+            const url = (data as any)?.[0]?.image_url as string | null | undefined;
+            if (!url) return null;
+            return [p.id, url] as const;
+          })
+        );
+
+        if (cancelled) return;
+
+        const next: Record<string, string> = {};
+        for (const e of entries) {
+          if (!e) continue;
+          next[e[0]] = e[1];
+        }
+        setPlanCardImages(next);
+      } catch {
+        if (!cancelled) setPlanCardImages({});
+      }
+    };
+
+    if (plans.length === 0) {
+      setPlanCardImages({});
+      return;
+    }
+
+    loadPlanCardImages();
+    return () => {
+      cancelled = true;
+    };
+  }, [plans]);
+
+  // Load representative exercise images for the plan details view
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadMuscleImages = async () => {
+      if (!viewingPlan) {
+        setMuscleExerciseImages({});
+        return;
+      }
+
+      try {
+        const pairs = await Promise.all(
+          viewingPlan.muscles.map(async (m) => {
+            // Try: exact muscle_group match + optional equipment filter
+            let q = supabase
+              .from("exercise_library" as any)
+              .select("image_url")
+              .eq("muscle_group", m.muscleId)
+              .limit(1);
+
+            if (m.equipment) {
+              q = q.eq("equipment", m.equipment);
+            }
+
+            const { data } = await q;
+            const url = (data as any)?.[0]?.image_url as string | null | undefined;
+            return [m.id, url ?? ""] as const;
+          })
+        );
+
+        if (cancelled) return;
+
+        const map: Record<string, string> = {};
+        for (const [muscleId, url] of pairs) {
+          if (url) map[muscleId] = url;
+        }
+        setMuscleExerciseImages(map);
+      } catch {
+        if (!cancelled) setMuscleExerciseImages({});
+      }
+    };
+
+    loadMuscleImages();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewingPlan]);
+
+  const loadPlans = async () => {
+    try {
+      setLoading(true);
+      const { data: plansData, error: plansError } = await supabase
+        .from('coach_plans' as any)
+        .select('*')
+        .eq('coach_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (plansError) throw plansError;
+
+      // Load muscles for each plan
+      const plansWithMuscles = await Promise.all(
+        (plansData || []).map(async (p: any) => {
+          const { data: musclesData, error: musclesError } = await supabase
+            .from('plan_muscles' as any)
+            .select('*')
+            .eq('plan_id', p.id)
+            .order('order_index', { ascending: true });
+
+          if (musclesError) throw musclesError;
+
+          return {
+            id: p.id,
+            name: p.name,
+            type: p.type,
+            imageUrl: p.image_url ?? "",
+            muscles: (musclesData || []).map((m: any) => ({
+              id: m.id,
+              muscleId: m.muscle_id,
+              muscleName: m.muscle_name,
+              exerciseCount: m.exercise_count,
+              sets: m.sets,
+              reps: m.reps,
+              equipment: m.equipment ?? "",
+              exerciseDescription: m.exercise_description ?? "",
+              order: m.order_index
+            }))
+          };
+        })
+      );
+
+      setPlans(plansWithMuscles);
+    } catch (error: any) {
+      console.error('Error loading plans:', error);
+      toast.error('Failed to load plans');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // --- Actions ---
   const addMuscle = (muscleId: string) => {
@@ -49,10 +236,17 @@ export default function Plan() {
       ...prev,
       muscles: [...prev.muscles, {
         id: createId(), muscleId, muscleName: name, exerciseCount: 3,
-        sets: 4, reps: "8-12", order: prev.muscles.length,
+        sets: 4, reps: "8-12", equipment: "", exerciseDescription: "", order: prev.muscles.length,
       }],
     }));
     toast.success(`Added ${name}`);
+  };
+
+  const toggleExerciseDescription = (muscleLocalId: string) => {
+    setOpenExerciseDescriptions((prev) => ({
+      ...prev,
+      [muscleLocalId]: !prev[muscleLocalId],
+    }));
   };
 
   const updateMuscle = (id: string, field: keyof PlanMuscle, value: any) => {
@@ -76,7 +270,7 @@ export default function Plan() {
     return { totalMuscles, totalExercises, totalSets };
   }, [plan.muscles]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!plan.name.trim()) {
       setNameError("Plan name is required");
       return;
@@ -85,11 +279,221 @@ export default function Plan() {
       toast.error("Select at least one muscle.");
       return;
     }
-    setPlans((prev) => [...prev, plan]);
-    setPlan({ name: "", type: "gold", muscles: [] }); // Reset form
-    setShowCreator(false);
-    toast.success("Plan saved!");
+    if (!user?.id) {
+      toast.error("You must be logged in");
+      return;
+    }
+
+    try {
+      // Save plan to database
+      const { data: savedPlan, error: planError } = await supabase
+        .from('coach_plans' as any)
+        .insert({
+          coach_id: user.id,
+          name: plan.name,
+          type: plan.type,
+          image_url: plan.imageUrl?.trim() || null,
+          description: null
+        })
+        .select()
+        .single();
+
+      if (planError || !savedPlan) throw planError || new Error('Failed to save plan');
+
+      // Save muscles
+      const musclesData = plan.muscles.map(m => ({
+        plan_id: (savedPlan as any).id,
+        muscle_id: m.muscleId,
+        muscle_name: m.muscleName,
+        exercise_count: m.exerciseCount,
+        sets: m.sets,
+        reps: m.reps,
+        equipment: m.equipment?.trim() || null,
+        exercise_description: m.exerciseDescription?.trim() || null,
+        order_index: m.order
+      }));
+
+      const { error: musclesError } = await supabase
+        .from('plan_muscles' as any)
+        .insert(musclesData);
+
+      if (musclesError) throw musclesError;
+
+      // Reload plans
+      await loadPlans();
+      
+      setPlan({ name: "", type: "gold", imageUrl: "", muscles: [] }); // Reset form
+      setOpenExerciseDescriptions({});
+      setShowCreator(false);
+      toast.success("Plan saved!");
+    } catch (error: any) {
+      console.error('Error saving plan:', error);
+      toast.error("Failed to save plan: " + error.message);
+    }
   };
+
+  const deletePlan = async (planId: string) => {
+    if (!confirm("Delete this plan?")) return;
+
+    try {
+      const { error } = await supabase
+        .from('coach_plans' as any)
+        .delete()
+        .eq('id', planId);
+
+      if (error) throw error;
+
+      await loadPlans();
+      toast.success("Plan deleted!");
+    } catch (error: any) {
+      console.error('Error deleting plan:', error);
+      toast.error("Failed to delete plan");
+    }
+  };
+
+  if (loading) {
+    return (
+      <MainLayout title="My Plans" subtitle="Loading...">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // View Plan Details
+  if (viewingPlan) {
+    return (
+      <MainLayout title={viewingPlan.name} subtitle="Plan Details">
+        <div className="max-w-5xl mx-auto p-4 space-y-6">
+          <Button 
+            variant="outline" 
+            onClick={() => setViewingPlan(null)}
+            className="mb-4"
+          >
+            ← Back to Plans
+          </Button>
+
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5">
+              <div className="flex flex-col md:flex-row gap-5 md:items-center">
+                {viewingPlan.imageUrl && (
+                  <div className="w-full md:w-[220px]">
+                    <img
+                      src={viewingPlan.imageUrl}
+                      alt={viewingPlan.name}
+                      className="w-full h-[140px] md:h-[120px] object-cover rounded-xl border"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+                )}
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-3xl mb-2">{viewingPlan.name}</CardTitle>
+                  <Badge className="text-xs uppercase">{viewingPlan.type}</Badge>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground mb-1">Total Muscles</div>
+                  <div className="text-3xl font-bold text-primary">{viewingPlan.muscles.length}</div>
+                </div>
+              </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-3 gap-4 mb-8 p-4 bg-muted/30 rounded-xl">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {viewingPlan.muscles.reduce((sum, m) => sum + m.exerciseCount, 0)}
+                  </div>
+                  <div className="text-xs text-muted-foreground uppercase">Total Exercises</div>
+                </div>
+                <div className="text-center border-x">
+                  <div className="text-2xl font-bold text-primary">
+                    {viewingPlan.muscles.reduce((sum, m) => sum + m.sets * m.exerciseCount, 0)}
+                  </div>
+                  <div className="text-xs text-muted-foreground uppercase">Total Sets</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {Math.round(viewingPlan.muscles.reduce((sum, m) => sum + m.sets * m.exerciseCount, 0) * 45 / 60)}
+                  </div>
+                  <div className="text-xs text-muted-foreground uppercase">Est. Minutes</div>
+                </div>
+              </div>
+
+              {/* Muscles List */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold mb-4">Muscle Groups</h3>
+                {viewingPlan.muscles.map((muscle, idx) => (
+                  <Card key={muscle.id} className="border-l-4 border-l-primary">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="bg-primary/10 rounded-full w-10 h-10 flex items-center justify-center font-bold text-primary">
+                            {idx + 1}
+                          </div>
+                          {muscleExerciseImages[muscle.id] && (
+                            <img
+                              src={muscleExerciseImages[muscle.id]}
+                              alt={`${muscle.muscleName} exercise`}
+                              className="w-14 h-14 rounded-xl border object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = "none";
+                              }}
+                            />
+                          )}
+                          <div>
+                            <h4 className="font-semibold text-lg">{muscle.muscleName}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {muscle.exerciseCount} exercises
+                            </p>
+                            {(muscle.equipment || muscle.exerciseDescription) && (
+                              <div className="mt-2 space-y-1">
+                                {muscle.equipment && (
+                                  <p className="text-sm text-muted-foreground">
+                                    <span className="font-medium text-foreground">Equipment:</span> {muscle.equipment}
+                                  </p>
+                                )}
+                                {muscle.exerciseDescription && (
+                                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                    <span className="font-medium text-foreground">Description:</span> {muscle.exerciseDescription}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-6 text-center">
+                          <div>
+                            <div className="text-xl font-bold">{muscle.sets}</div>
+                            <div className="text-xs text-muted-foreground uppercase">Sets</div>
+                          </div>
+                          <div>
+                            <div className="text-xl font-bold">{muscle.reps}</div>
+                            <div className="text-xs text-muted-foreground uppercase">Reps</div>
+                          </div>
+                          <div>
+                            <div className="text-xl font-bold">{muscle.sets * muscle.exerciseCount}</div>
+                            <div className="text-xs text-muted-foreground uppercase">Total Sets</div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
 
   // 1. شاشة فارغة (لا توجد خطط)
   if (plans.length === 0 && !showCreator) {
@@ -130,6 +534,23 @@ export default function Plan() {
 
           {plans.map((p, i) => (
             <Card key={i} className="shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              {(p.imageUrl || (p.id ? planCardImages[p.id] : "")) ? (
+                <div className="w-full h-[140px] bg-muted/30">
+                  <img
+                    src={p.imageUrl || (p.id ? planCardImages[p.id] : "")}
+                    alt={p.name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-[140px] bg-muted/30 flex items-center justify-center text-muted-foreground">
+                  <Dumbbell className="w-8 h-8" />
+                </div>
+              )}
               <CardHeader className="pb-3 border-b bg-muted/20">
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-lg">{p.name}</CardTitle>
@@ -142,10 +563,15 @@ export default function Plan() {
                     <span>{p.muscles.reduce((a, b) => a + b.exerciseCount, 0)} Exercises</span>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1">View</Button>
-                    <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-400" onClick={() => {
-                        if(confirm("Delete this plan?")) setPlans(plans.filter((_, idx) => idx !== i))
-                    }}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => setViewingPlan(p)}
+                    >
+                      View
+                    </Button>
+                    <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-400" onClick={() => deletePlan(p.id!)}>
                         <Trash2 className="w-4 h-4" />
                     </Button>
                 </div>
@@ -176,6 +602,27 @@ export default function Plan() {
                 />
               </div>
               <div>
+                <Label>Plan Image URL (Optional)</Label>
+                <Input
+                  value={plan.imageUrl ?? ""}
+                  onChange={(e) => setPlan((p) => ({ ...p, imageUrl: e.target.value }))}
+                  placeholder="https://..."
+                />
+                {plan.imageUrl?.trim() && (
+                  <div className="mt-2">
+                    <img
+                      src={plan.imageUrl}
+                      alt="Plan preview"
+                      className="w-full h-[140px] object-cover rounded-lg border"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              <div>
                 <Label>Type</Label>
                 <Select value={plan.type} onValueChange={(v:any) => setPlan(p => ({ ...p, type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -197,29 +644,97 @@ export default function Plan() {
                 ) : (
                     <div className="space-y-4">
                     {plan.muscles.map((muscle) => (
-                        <div key={muscle.id} className="group flex items-center justify-between gap-4 border-b pb-4 last:border-0 hover:bg-muted/30 p-2 rounded-lg transition-all">
-                        <div className="flex-1 min-w-[120px]">
-                            <span className="font-semibold text-sm sm:text-base text-foreground">{muscle.muscleName}</span>
-                        </div>
-                        <div className="flex items-center gap-4 sm:gap-6">
-                            <div className="flex flex-col items-center gap-1">
+                        <div key={muscle.id} className="border rounded-xl p-3 hover:bg-muted/30 transition-all">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-[140px]">
+                              <span className="font-semibold text-sm sm:text-base text-foreground">{muscle.muscleName}</span>
+                            </div>
+                            <div className="flex items-center gap-3 sm:gap-5">
+                              <div className="flex flex-col items-center gap-1">
                                 <Label className="text-[10px] uppercase text-muted-foreground font-bold">Exer</Label>
-                                <Input type="number" value={muscle.exerciseCount} onChange={(e) => updateMuscle(muscle.id, "exerciseCount", Number(e.target.value))} min={1} className="w-14 h-9 text-center bg-background"/>
-                            </div>
-                            <div className="flex flex-col items-center gap-1">
+                                <Input
+                                  type="number"
+                                  value={muscle.exerciseCount}
+                                  onChange={(e) => updateMuscle(muscle.id, "exerciseCount", Number(e.target.value))}
+                                  min={1}
+                                  className="w-14 h-9 text-center bg-background"
+                                />
+                              </div>
+                              <div className="flex flex-col items-center gap-1">
                                 <Label className="text-[10px] uppercase text-muted-foreground font-bold">Sets</Label>
-                                <Input type="number" value={muscle.sets} onChange={(e) => updateMuscle(muscle.id, "sets", Number(e.target.value))} min={1} className="w-14 h-9 text-center bg-background"/>
-                            </div>
-                            <div className="flex flex-col items-center gap-1">
+                                <Input
+                                  type="number"
+                                  value={muscle.sets}
+                                  onChange={(e) => updateMuscle(muscle.id, "sets", Number(e.target.value))}
+                                  min={1}
+                                  className="w-14 h-9 text-center bg-background"
+                                />
+                              </div>
+                              <div className="flex flex-col items-center gap-1">
                                 <Label className="text-[10px] uppercase text-muted-foreground font-bold">Reps</Label>
-                                <Input value={muscle.reps} onChange={(e) => updateMuscle(muscle.id, "reps", e.target.value)} className="w-16 h-9 text-center text-sm bg-background" placeholder="8-12"/>
-                            </div>
-                            <div className="pt-5"> 
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all rounded-full" onClick={() => removeMuscle(muscle.id)}>
-                                    <Trash2 className="w-4 h-4" />
+                                <Input
+                                  value={muscle.reps}
+                                  onChange={(e) => updateMuscle(muscle.id, "reps", e.target.value)}
+                                  className="w-16 h-9 text-center text-sm bg-background"
+                                  placeholder="8-12"
+                                />
+                              </div>
+                              <div className="pt-5">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all rounded-full"
+                                  onClick={() => removeMuscle(muscle.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
                                 </Button>
+                              </div>
                             </div>
-                        </div>
+                          </div>
+
+                          <div className="mt-4 grid gap-3">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">المعدة/الأداة (Equipment)</Label>
+                              <Select
+                                value={muscle.equipment || undefined}
+                                onValueChange={(v: any) => updateMuscle(muscle.id, "equipment", v)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="اختر جهاز" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {EQUIPMENT_OPTIONS.map((opt) => (
+                                    <SelectItem key={opt} value={opt}>
+                                      {opt}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs text-muted-foreground">وصف التمرين (Exercise Description)</Label>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 px-2"
+                                  onClick={() => toggleExerciseDescription(muscle.id)}
+                                >
+                                  {openExerciseDescriptions[muscle.id] ? "Hide" : "Add"}
+                                </Button>
+                              </div>
+
+                              {openExerciseDescriptions[muscle.id] && (
+                                <Textarea
+                                  value={muscle.exerciseDescription}
+                                  onChange={(e) => updateMuscle(muscle.id, "exerciseDescription", e.target.value)}
+                                  placeholder="اكتب وصف سريع للتمرين..."
+                                  className="min-h-[90px]"
+                                />
+                              )}
+                            </div>
+                          </div>
                         </div>
                     ))}
                     </div>

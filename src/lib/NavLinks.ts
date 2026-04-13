@@ -9,12 +9,14 @@ import {
   Settings,
   BarChart3,
   Target,
-  BicepsFlexed
+  BicepsFlexed,
+  ClipboardList
 } from "lucide-react";
 import { NavType } from "@/types/navLinks";
 
 export const userNavItems: NavType[] = [
   { icon: Home, label: "Dashboard", path: "/dashboard" },
+  { icon: ClipboardList, label: "Coach Plan", path: "/coach-plan" },
   { icon: BicepsFlexed, label: "Exercises", path: "/exercises" }, 
   { icon: Utensils, label: "Nutrition", path: "/nutrition" },
   { icon: Dumbbell, label: "Workouts", path: "/workouts" },
