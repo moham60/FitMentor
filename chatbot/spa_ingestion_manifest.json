@@ -1,0 +1,171 @@
+{
+  "pages": {
+    "http://localhost:8080/": {
+      "route": "/",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "1c8d0c3e34f0501df91629d5a7e68c51a144045ef2020a4df83b650a164560e6",
+      "chunk_ids": [],
+      "word_count": 58,
+      "synced_at": "2026-05-04T21:59:39.196040+00:00"
+    },
+    "http://localhost:8080/signup": {
+      "route": "/signup",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "586e14eaf5cb3915fc9d62466ca8e4a4c0c1ff0fd6ae1ea9d59cec853c334008",
+      "chunk_ids": [],
+      "word_count": 37,
+      "synced_at": "2026-05-04T21:59:39.196677+00:00"
+    },
+    "http://localhost:8080/signin": {
+      "route": "/signin",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "734f5cb50ffc9648194bb30720be635e55d5998b28bafadd041b78e827dc1d26",
+      "chunk_ids": [],
+      "word_count": 29,
+      "synced_at": "2026-05-04T21:59:39.196958+00:00"
+    },
+    "http://localhost:8080/posts": {
+      "route": "/posts",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "d14fac499c234eb88cb06588475f8f075dfeb04096a0de5e6b79477d78a44ba1",
+      "chunk_ids": [
+        "0561d11d684f3e6872db58769275cea9427c2305f06df16f7ceafd2719358963"
+      ],
+      "word_count": 85,
+      "synced_at": "2026-05-04T22:13:04.033062+00:00"
+    },
+    "http://localhost:8080/dashboard": {
+      "route": "/dashboard",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "f4d43506091423463572ab8c97d7a439e956945249e59abcc242984e7881edbb",
+      "chunk_ids": [
+        "e71307ca0c9dc014ec475026fafbeea999eec86ce14cba281048335260341823"
+      ],
+      "word_count": 171,
+      "synced_at": "2026-05-04T22:13:04.033314+00:00"
+    },
+    "http://localhost:8080/chat": {
+      "route": "/chat",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "96099bc131f04c569555185cfed2f8ebdb5e5c05b6a09c0d01afab7054bc2ff8",
+      "chunk_ids": [],
+      "word_count": 25,
+      "synced_at": "2026-05-04T22:13:04.033346+00:00"
+    },
+    "http://localhost:8080/exercises": {
+      "route": "/exercises",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "7c1c7c94038a872a6e21e49ee1d41313bed23c08baea01b6832d10ab6c10c5dc",
+      "chunk_ids": [
+        "19a667ffc504c103e0f602183e20337cc7071d9daafbfd74fed110069178724f"
+      ],
+      "word_count": 109,
+      "synced_at": "2026-05-04T22:13:04.033944+00:00"
+    },
+    "http://localhost:8080/nutrition": {
+      "route": "/nutrition",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "c4637451888af789f2b1a382780aa742a1d42fa0d258026e67f325b1531a57a2",
+      "chunk_ids": [],
+      "word_count": 330,
+      "synced_at": "2026-05-04T22:13:04.034295+00:00"
+    },
+    "http://localhost:8080/workouts": {
+      "route": "/workouts",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "9dc75d733d3efa1c984bf344484593a17fab25814ed74ef7cdade1e6dfad2975",
+      "chunk_ids": [
+        "fd08fc7ad454ebb6d2137b7f7972339a14ee16d155492a16924bd080b27bafce"
+      ],
+      "word_count": 120,
+      "synced_at": "2026-05-04T22:13:04.034719+00:00"
+    },
+    "http://localhost:8080/inbody": {
+      "route": "/inbody",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "8a6b660e7eefc6f801252d34071640bdf09f5e23e106178e4b7fee765ee24f88",
+      "chunk_ids": [],
+      "word_count": 57,
+      "synced_at": "2026-05-04T22:13:04.034788+00:00"
+    },
+    "http://localhost:8080/settings": {
+      "route": "/settings",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "d12e171dd6c8f6071a46cc01d97a684bb800e4001113453c7367f814f6fc03cb",
+      "chunk_ids": [],
+      "word_count": 82,
+      "synced_at": "2026-05-04T22:13:04.035136+00:00"
+    },
+    "http://localhost:8080/profile": {
+      "route": "/profile",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "739467e9368d858e40e84a92dcc593ca78e3ab95d06396555574d2e39356c145",
+      "chunk_ids": [
+        "044883504001cd37e2412c15e59fa05ef0a2add4a766607e85a1ddc5b5711d27"
+      ],
+      "word_count": 83,
+      "synced_at": "2026-05-04T22:13:04.035663+00:00"
+    },
+    "http://localhost:8080/subscription": {
+      "route": "/subscription",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "6aa9321b5d3ba46d64c98ecd2a970d0a04e8aff95b80577bef006ebb8a45d03f",
+      "chunk_ids": [
+        "ec5091115d7e9d54f29e64384e0dbf887541695d693b64d60b3557df45218065"
+      ],
+      "word_count": 188,
+      "synced_at": "2026-05-04T22:13:04.035929+00:00"
+    },
+    "http://localhost:8080/checkout": {
+      "route": "/checkout",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "e0333f9dcc5149510a689d341c8cf35dc08a3af1fbf7323e2403497d7be1ba9c",
+      "chunk_ids": [],
+      "word_count": 34,
+      "synced_at": "2026-05-04T22:13:04.035964+00:00"
+    },
+    "http://localhost:8080/coach-plan": {
+      "route": "/coach-plan",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "4f43083ff42afbf08d2c03a79124bfc6899ad3f055cc128f25b6d1989bde1fd5",
+      "chunk_ids": [],
+      "word_count": 22,
+      "synced_at": "2026-05-04T22:13:04.036208+00:00"
+    },
+    "http://localhost:8080/ai-assistant": {
+      "route": "/ai-assistant",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "3cab6db02701855010d91c505cde4e814c5cd0a74cd05b438787aaeee0658c8a",
+      "chunk_ids": [
+        "059e7efa3767ca04610876406db1a181b6d59ca5a1091a19c10cccedfa9492d9"
+      ],
+      "word_count": 69,
+      "synced_at": "2026-05-04T22:13:04.036618+00:00"
+    },
+    "http://localhost:8080/coach/clients": {
+      "route": "/coach/clients",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "44e2e6b5fd273994309596c2128b4803603b9be16236cd9942047d9be7e8604e",
+      "chunk_ids": [],
+      "word_count": 37,
+      "synced_at": "2026-05-04T22:13:04.036679+00:00"
+    },
+    "http://localhost:8080/coach/earnings": {
+      "route": "/coach/earnings",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "aa883a1c8e7df68a0bf5b0b8855fa269c7c4d039e70a44abbe06dd697406a8fc",
+      "chunk_ids": [],
+      "word_count": 66,
+      "synced_at": "2026-05-04T22:13:04.036976+00:00"
+    },
+    "http://localhost:8080/coach/plans": {
+      "route": "/coach/plans",
+      "title": "FitMintor - Transform Your Body with AI-Powered Fitness",
+      "hash": "025743f389f4c50b04586a46870470233c136567e78896a81a11633d11b26eb5",
+      "chunk_ids": [],
+      "word_count": 41,
+      "synced_at": "2026-05-04T22:13:04.037288+00:00"
+    }
+  },
+  "updated_at": "2026-05-04T22:13:06.378330+00:00"
+}
