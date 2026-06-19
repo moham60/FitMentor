@@ -1,8 +1,5 @@
-import AIAssistantView from "@/components/ai/AIAssistantView";
+import AIAssistantView from '@/components/ai/AIAssistantView';
 
-
-export default function AIAssistantpage() {
-  return (
-   <AIAssistantView/>
-  );
+export default function AIAssistantPage() {
+  return <AIAssistantView />;
 }

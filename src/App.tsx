@@ -1,12 +1,12 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "./components/ui/toaster";
+import { Toaster as Sonner } from "./components/ui/sonner";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { ThemeProvider } from "@/contexts/ThemeContext";
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { useEffect,  useState } from "react";
+import { supabase } from "./integrations/supabase/client";
 
 
 // Pages
@@ -33,7 +33,6 @@ import ChatPage from "./pages/ChatPage";
 import ChatNotificationsListener from "./components/chat/ChatNotificationsListener";
 import SubscriptionPage from "./userPages/SubscriptionPage";
 import CheckoutPage from "./userPages/CheckoutPage";
-import SessionPage from "./userPages/SessionPage";
 
 const queryClient = new QueryClient();
 
@@ -263,17 +262,6 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <OnboardingGate>
               <WorkoutsPage />
-            </OnboardingGate>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/session/:sessionId"
-        element={
-          <ProtectedRoute>
-            <OnboardingGate>
-              <SessionPage />
             </OnboardingGate>
           </ProtectedRoute>
         }

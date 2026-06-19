@@ -7,34 +7,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Dependencies
 node_modules
 dist
 dist-ssr
 *.local
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.venv/
-venv/
-env/
-ENV/
-*.egg-info/
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Build artifacts
-*.index
-*.index.json
-
-# IDE
+# Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -44,12 +22,3 @@ ENV/
 *.njsproj
 *.sln
 *.sw?
-
-# Vite cache
-.vite/
-.vite-temp/
-
-# Debug/temp files
-auth-state.json
-*_payload.json
-*_manifest.json

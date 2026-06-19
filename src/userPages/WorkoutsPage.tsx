@@ -9,7 +9,6 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useNavigate } from 'react-router-dom';
 import { 
   Dumbbell, 
   BrainCircuit, 
@@ -27,7 +26,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 // --- Types & Constants matching API ---
@@ -58,18 +56,10 @@ const MOCK_USER_PROFILE = {
 };
 
 const WorkoutGenerator = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
   // State
   const [mode, setMode] = useState<'me' | 'custom'>('me');
   const [loading, setLoading] = useState(false);
-  const [savingRoutine, setSavingRoutine] = useState(false);
-  const [loadingRoutines, setLoadingRoutines] = useState(false);
-  const [startingRoutineId, setStartingRoutineId] = useState<string | null>(null);
   const [generatedPlan, setGeneratedPlan] = useState<any>(null);
-  const [savedRoutineId, setSavedRoutineId] = useState<string | null>(null);
-  const [savedRoutines, setSavedRoutines] = useState<any[]>([]);
   const [serverError, setServerError] = useState(false);
 
   // Form Data
@@ -102,33 +92,6 @@ const WorkoutGenerator = () => {
     ]);
   }, []);
 
-  useEffect(() => {
-    void fetchSavedRoutines();
-  }, [user?.id]);
-
-  const fetchSavedRoutines = async () => {
-    if (!user?.id) {
-      setSavedRoutines([]);
-      return;
-    }
-
-    setLoadingRoutines(true);
-    try {
-      const response = await fetch(`http://127.0.0.1:8000/api/model2/routines?user_id=${encodeURIComponent(user.id)}`);
-      if (!response.ok) {
-        throw new Error('Failed to load saved routines');
-      }
-
-      const data = await response.json();
-      setSavedRoutines(Array.isArray(data?.routines) ? data.routines : []);
-    } catch (error) {
-      console.error('Load routines failed:', error);
-      setSavedRoutines([]);
-    } finally {
-      setLoadingRoutines(false);
-    }
-  };
-
   // Helpers
   const updateForm = (key: string, value: any) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -147,7 +110,6 @@ const WorkoutGenerator = () => {
   // Generate Workout Handler
   const handleGenerate = async () => {
     setServerError(false);
-    setSavedRoutineId(null);
 
     if (formData.target_muscles.length === 0 || formData.equipment.length === 0) {
       toast.error("Please select at least one muscle group and one equipment type.");
@@ -167,7 +129,7 @@ const WorkoutGenerator = () => {
 
     try {
       // 1. Call the API
-      const response = await fetch('http://127.0.0.1:8000/api/model2/recommend', {
+      const response = await fetch('http://localhost:8000/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -192,96 +154,6 @@ const WorkoutGenerator = () => {
       setGeneratedPlan(null); // Ensure no old data is shown
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSaveRoutine = async () => {
-    if (!generatedPlan) {
-      toast.error('Generate a workout plan first.');
-      return;
-    }
-
-    if (!user?.id) {
-      toast.error('You must be signed in to save a routine.');
-      return;
-    }
-
-    setSavingRoutine(true);
-
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/model2/routines/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.id,
-          title: `${generatedPlan.goal || 'Workout'} Routine`,
-          plan: generatedPlan,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail?.error || 'Failed to save routine');
-      }
-
-      const data = await response.json();
-      setSavedRoutineId(data?.routine?.id ?? null);
-      setSavedRoutines(prev => [data.routine, ...prev.filter(item => item?.id !== data?.routine?.id)]);
-      toast.success('Workout routine saved successfully!');
-    } catch (error) {
-      console.error('Save routine failed:', error);
-      toast.error('Failed to save workout routine. Please try again.');
-    } finally {
-      setSavingRoutine(false);
-    }
-  };
-
-  const handleRestoreRoutine = (routine: any) => {
-    if (!routine?.plan) {
-      toast.error('This routine has no plan data to restore.');
-      return;
-    }
-
-    setGeneratedPlan(routine.plan);
-    setSavedRoutineId(routine.id ?? null);
-    toast.success('Routine restored. You can review it or start a session.');
-  };
-
-  const handleStartSession = async (routine: any) => {
-    if (!routine?.id) {
-      toast.error('Routine not found.');
-      return;
-    }
-
-    if (!user?.id) {
-      toast.error('You must be signed in to start a session.');
-      return;
-    }
-
-    setStartingRoutineId(routine.id);
-    try {
-      const response = await fetch(`http://127.0.0.1:8000/api/model2/routines/${routine.id}/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail?.error || 'Failed to start session');
-      }
-
-      const data = await response.json();
-      const sessionId = data?.session?.id;
-      toast.success('Session started successfully!');
-      if (sessionId) {
-        navigate(`/session/${sessionId}`);
-      }
-    } catch (error) {
-      console.error('Start session failed:', error);
-      toast.error('Failed to start workout session. Please try again.');
-    } finally {
-      setStartingRoutineId(null);
     }
   };
 
@@ -507,60 +379,6 @@ const WorkoutGenerator = () => {
                 )}
               </Button>
 
-              <div className="pt-4 border-t space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Saved Routines</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void fetchSavedRoutines()}
-                    disabled={loadingRoutines}
-                    className="text-xs"
-                  >
-                    {loadingRoutines ? 'Refreshing...' : 'Refresh'}
-                  </Button>
-                </div>
-
-                {loadingRoutines ? (
-                  <div className="space-y-2">
-                    <div className="h-16 rounded-xl bg-muted/50 animate-pulse" />
-                    <div className="h-16 rounded-xl bg-muted/50 animate-pulse" />
-                  </div>
-                ) : savedRoutines.length === 0 ? (
-                  <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-                    No saved routines yet.
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-64 overflow-auto pr-1">
-                    {savedRoutines.map((routine) => (
-                      <div key={routine.id} className="rounded-xl border bg-card p-3 space-y-3">
-                        <div>
-                          <p className="font-semibold text-sm text-foreground">{routine.title || 'Workout Routine'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Saved {routine.created_at ? new Date(routine.created_at).toLocaleString() : 'recently'}
-                          </p>
-                        </div>
-
-                        <div className="flex gap-2 flex-wrap">
-                          <Button type="button" variant="outline" size="sm" onClick={() => handleRestoreRoutine(routine)}>
-                            Restore
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => handleStartSession(routine)}
-                            disabled={startingRoutineId === routine.id}
-                          >
-                            {startingRoutineId === routine.id ? 'Starting...' : 'Start Session'}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
             </CardContent>
           </Card>
         </div>
@@ -679,29 +497,9 @@ const WorkoutGenerator = () => {
                         <CheckCircle2 className="w-5 h-5 text-green-500" />
                         Recommended Routine
                     </h2>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={handleSaveRoutine}
-                        disabled={savingRoutine || !generatedPlan}
-                    >
-                        {savingRoutine ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : savedRoutineId ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                            Saved
-                          </>
-                        ) : (
-                          <>
-                            <ArrowRight className="w-4 h-4" />
-                            Save Routine
-                          </>
-                        )}
+                    <Button variant="outline" size="sm" className="gap-2">
+                        <ArrowRight className="w-4 h-4" />
+                        Save Routine
                     </Button>
                 </div>
 

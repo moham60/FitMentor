@@ -56,45 +56,12 @@ Response format:
 - No ** ** for bold, no __ __ for underline
 - Use plain text labels followed by colon for sections
 - Include specific numbers (calories, sets, reps, etc.) based on user's data
-- Use the user memory snapshot as authoritative history across chats and sessions
-- Never ask the user to repeat details already present in the user memory snapshot
-- If enough profile or memory data exists for a workout or meal plan, answer directly with a personalized plan and only mention assumptions if one or two fields are missing
-- Keep responses focused and under 350 words unless a full plan is requested"""
-SYSTEM_PROMPT = """You are FitMentor AI — a certified sports science and nutrition coach integrated into the FitMentor fitness platform.
-
-Your role:
-- Give personalized, evidence-based fitness and nutrition advice
-- When the user's biometric data is available, always reference it explicitly
-- Be direct, specific, and actionable — avoid vague generic advice
-- Use a warm, motivating tone
-- Respond in the same language as the user (Arabic or English)
-- Never recommend dangerous practices or replace medical advice
-
-Memory handling and safety (STRICT):
-- Treat the provided `memory_snapshot` as the single authoritative record of prior user facts and prior conversation content for this request.
-- Do NOT ask the user to repeat, confirm, or re-provide any detail that is present in the `memory_snapshot`.
-- If the `memory_snapshot` contains conflicting or ambiguous details, do NOT ask the user to disambiguate; instead, state your most conservative assumption clearly (prefix with "Assumption:") and proceed with safe, conservative guidance.
-- If an essential medical safety detail (e.g., insulin use, severe allergy) is missing from `memory_snapshot`, state that the recommendation is made without that detail and recommend the specific check the user should provide (do not repeatedly prompt during generation).
-
-Response format:
-- Return clean, structured plain text. No markdown, no special formatting, no symbols.
-- Use numbers (1. 2. 3.) for lists instead of • or -
-- No ** ** for bold, no __ __ for underline
-- Use plain text labels followed by colon for sections
-- Include specific numbers (calories, sets, reps, etc.) based on user's data
-- Use the user memory snapshot as authoritative history across chats and sessions
-- Never ask the user to repeat details already present in the user memory snapshot
-- If enough profile or memory data exists for a workout or meal plan, answer directly with a personalized plan and only mention assumptions if one or two fields are missing
 - Keep responses focused and under 350 words unless a full plan is requested"""
 
 # Context assembly template
 CONTEXT_TEMPLATE = """=== RETRIEVED CONTEXT ===
 
 {context}
-
-=== USER MEMORY SNAPSHOT ===
-
-{memory_snapshot}
 
 === ROUTING METADATA ===
 Mode: {routing_mode}
@@ -113,7 +80,6 @@ chat_prompt = ChatPromptTemplate.from_messages([
 def _format_context(
     structured_ctx: StructuredContext | None,
     vector_docs: list[dict],
-    conversation_history: str | None = None,
 ) -> str:
     """Format retrieved context from structured + vector sources."""
     sections = []
@@ -218,15 +184,6 @@ class HybridRAGEngine:
                 context=RunnableLambda(self._get_formatted_context),
                 routing_mode=RunnableLambda(lambda x: x["routing"].mode.value),
                 intent=RunnableLambda(lambda x: x["routing"].intent),
-                conversation_history=RunnableLambda(
-                    lambda x: x.get("conversation_history") or "No prior conversation memory available."
-                ),
-                persistent_memory=RunnableLambda(
-                    lambda x: x.get("persistent_memory") or "No persistent user memory available."
-                ),
-                memory_snapshot=RunnableLambda(
-                    lambda x: x.get("memory_snapshot") or "No known user memory available."
-                ),
             )
             | chat_prompt
             | self.llm
@@ -240,7 +197,6 @@ class HybridRAGEngine:
         return _format_context(
             input_dict.get("structured_ctx"),
             input_dict.get("vector_docs", []),
-            input_dict.get("conversation_history"),
         )
 
     def _format_context_wrapper(self, input_dict: dict) -> str:
@@ -256,9 +212,6 @@ class HybridRAGEngine:
         routing: RoutingDecision,
         structured_ctx: StructuredContext | None = None,
         user_id: str | None = None,
-        conversation_history: str | None = None,
-        persistent_memory: str | None = None,
-        memory_snapshot: str | None = None,
     ) -> RAGResult:
         """
         Full LangChain RAG pipeline with caching (OPTIMIZED):
@@ -335,9 +288,6 @@ class HybridRAGEngine:
                 "routing": routing,
                 "structured_ctx": structured_ctx,
                 "vector_docs": vector_docs,
-                "conversation_history": conversation_history,
-                "persistent_memory": persistent_memory,
-                "memory_snapshot": memory_snapshot,
             })
         except Exception as e:
             logger.error(f"[RAGEngine] LLM chain failed: {e}")
@@ -368,9 +318,6 @@ class HybridRAGEngine:
         routing: RoutingDecision,
         structured_ctx: StructuredContext | None = None,
         user_id: str | None = None,
-        conversation_history: str | None = None,
-        persistent_memory: str | None = None,
-        memory_snapshot: str | None = None,
     ) -> AsyncIterator[dict]:
         """
         Stream generated answer chunks and finish with response metadata.
@@ -436,9 +383,6 @@ class HybridRAGEngine:
             "routing": routing,
             "structured_ctx": structured_ctx,
             "vector_docs": vector_docs,
-            "conversation_history": conversation_history,
-            "persistent_memory": persistent_memory,
-            "memory_snapshot": memory_snapshot,
         }
 
         answer_parts: list[str] = []
