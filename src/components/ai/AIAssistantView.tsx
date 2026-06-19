@@ -748,14 +748,33 @@ export default function AIAssistantView() {
                 ) : (
                   <div className="space-y-4">
                     {messages.length === 0 && (
-                      <div className="mx-auto flex max-w-xl flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-background/70 p-8 text-center">
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow">
-                          <Bot className="h-6 w-6 text-primary-foreground" />
+                      <div className="mx-auto flex max-w-2xl flex-col items-center justify-center rounded-3xl border border-border/40 bg-card/40 p-8 text-center backdrop-blur-sm shadow-sm relative overflow-hidden">
+                        <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
+                        <div className="absolute -bottom-24 -left-24 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
+                        <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/80 to-primary shadow-glow relative z-10">
+                          <Bot className="h-8 w-8 text-primary-foreground" />
                         </div>
-                        <p className="text-lg font-semibold">Start a FitMentor chat</p>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Ask about workouts, nutrition, your progress, or where to find something in the app.
+                        <h2 className="text-2xl font-bold mb-2 relative z-10">مرحباً! كيف يمكنني مساعدتك اليوم؟</h2>
+                        <p className="text-muted-foreground mb-8 relative z-10 max-w-md">
+                          أنا مساعدك الذكي في FitMentor. يمكنك سؤالي عن التمارين، التغذية، أو أي شيء يخص رحلتك الرياضية.
                         </p>
+                        
+                        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 relative z-10">
+                          {starterPrompts.map((prompt) => (
+                            <button
+                              key={prompt}
+                              type="button"
+                              onClick={() => void sendMessage(prompt)}
+                              className="group flex flex-col items-start gap-2 rounded-2xl border border-border/50 bg-background/50 p-4 text-right transition-all hover:-translate-y-1 hover:border-primary/50 hover:bg-card hover:shadow-md"
+                            >
+                              <span className="text-sm font-medium">{prompt}</span>
+                              <div className="flex w-full items-center justify-between mt-1">
+                                <span className="text-xs text-muted-foreground">اضغط للإرسال</span>
+                                <Sparkles className="h-3 w-3 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
 
@@ -770,11 +789,11 @@ export default function AIAssistantView() {
                         <div
                           className={`max-w-[85%] rounded-2xl border px-4 py-3 shadow-sm ${
                             message.role === 'user'
-                              ? 'border-transparent bg-gradient-primary text-primary-foreground'
-                              : 'border-border/70 bg-card text-foreground'
+                              ? 'border-transparent bg-gradient-primary text-primary-foreground rounded-br-sm'
+                              : 'border-border/50 bg-card/80 backdrop-blur-sm text-foreground rounded-bl-sm'
                           }`}
                         >
-                          <div className="whitespace-pre-wrap text-sm leading-7 md:text-[15px]">
+                          <div dir="auto" className="whitespace-pre-wrap text-sm leading-relaxed md:text-[15px]">
                             {message.content || (message.role === 'assistant' && sending ? (
                               <span className="inline-flex items-center gap-1 text-muted-foreground" aria-label="thinking">
                                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" />
@@ -827,43 +846,27 @@ export default function AIAssistantView() {
                   </div>
                 )}
 
-                {!hasReachedLimit && messages.length === 0 && (
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    {starterPrompts.map((prompt) => (
-                      <Button
-                        key={prompt}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() => void sendMessage(prompt)}
-                      >
-                        {prompt}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex gap-3 items-end">
-                  <div className="flex-1">
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1 relative group">
                     <Textarea
+                      dir="auto"
                       value={input}
                       onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setInput(event.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder={hasReachedLimit ? 'Start a new chat to continue...' : 'اكتب سؤالك هنا...'}
+                      placeholder={hasReachedLimit ? 'Start a new chat to continue...' : 'اسألني أي شيء عن التمارين أو التغذية...'}
                       disabled={sending || loadingMessages || hasReachedLimit}
-                      className="min-h-[88px] resize-none rounded-2xl border-border/70 bg-background"
+                      className="min-h-[60px] max-h-[160px] resize-none rounded-2xl border-border/50 bg-background/50 backdrop-blur-sm px-4 py-4 pr-14 focus-visible:ring-primary/30 transition-all shadow-sm scrollbar-thin"
                     />
+                    <Button
+                      type="button"
+                      size="icon"
+                      onClick={() => void sendMessage(input)}
+                      disabled={sending || loadingMessages || hasReachedLimit || !input.trim()}
+                      className="absolute bottom-2 right-2 h-[44px] w-[44px] rounded-xl transition-all shadow-glow hover:scale-105 active:scale-95"
+                    >
+                      {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 rtl:-scale-x-100" />}
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => void sendMessage(input)}
-                    disabled={sending || loadingMessages || hasReachedLimit || !input.trim()}
-                    className="gap-2 rounded-2xl px-5"
-                  >
-                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    Send
-                  </Button>
                 </div>
               </div>
             </CardContent>
