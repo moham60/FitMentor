@@ -220,16 +220,6 @@ def _cache_key_rag_response(query: str, user_id: str | None = None) -> str:
     return f"rag:response:{_hash_key(query)}{suffix}"
 
 
-def _cache_key_workout_routine(routine_id: str) -> str:
-    """Generate cache key for workout routine."""
-    return f"workout:routine:{routine_id}"
-
-
-def _cache_key_workout_routines_index(user_id: str) -> str:
-    """Generate cache key for user's workout routines index."""
-    return f"workout:index:{user_id}"
-
-
 # ── Caching Decorators ─────────────────────────────────────────────────────────
 
 def cached(ttl: int):
