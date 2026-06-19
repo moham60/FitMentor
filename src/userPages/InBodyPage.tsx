@@ -4,19 +4,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { 
-  Activity, 
-  Scale, 
-  Dumbbell, 
-  ScanLine, 
-  FileText, 
-  RotateCcw, 
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  Activity,
+  Scale,
+  Dumbbell,
+  ScanLine,
+  FileText,
+  RotateCcw,
   TrendingUp,
   User,
   Flame,
   CheckCircle2,
   ArrowRight,
-  UploadCloud
+  UploadCloud,
+  Loader2
 } from 'lucide-react';
 
 // --- Data Structure (Simulation) ---
@@ -52,9 +55,12 @@ const SIMULATED_OCR_DATA = {
 };
 
 const InBodyPage = () => {
+  const { user } = useAuth();
+  const apiBaseUrl = import.meta.env.VITE_CHATBOT_API_URL || 'http://localhost:8000';
   const [scanningState, setScanningState] = useState<'idle' | 'scanning' | 'complete'>('idle');
   const [progress, setProgress] = useState(0);
   const [scannedData, setScannedData] = useState<typeof SIMULATED_OCR_DATA | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Simulation Logic
   const startSimulation = () => {
@@ -79,9 +85,85 @@ const InBodyPage = () => {
   }, [scanningState]);
 
   const handleReset = () => {
-      setScanningState('idle');
-      setScannedData(null);
-      setProgress(0);
+    setScanningState('idle');
+    setScannedData(null);
+    setProgress(0);
+  };
+
+  const handleSaveToProfile = async () => {
+    if (!user?.id || !scannedData) {
+      toast.error('User or data not found');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      // Transform scannedData to InBodyData format
+      const measurementDate = new Date().toISOString().split('T')[0];
+      const inbodyData = {
+        height_cm: scannedData.header.height,
+        weight_kg: scannedData.bodyComposition.weight,
+        smm_kg: scannedData.bodyComposition.smm,
+        muscle_mass_kg: scannedData.bodyComposition.smm,
+        pbf_percent: scannedData.obesityAnalysis.pbf,
+        body_fat_percentage: scannedData.obesityAnalysis.pbf,
+        water_percentage: scannedData.scores.visceralFatLevel * 5, // Estimated
+        bone_mass_kg: 3.5, // Default estimate
+        bmi: scannedData.obesityAnalysis.bmi,
+        bmr_kcal: scannedData.scores.bmr,
+        bmr: scannedData.scores.bmr,
+        measurement_date: measurementDate,
+        test_date: scannedData.header.date || measurementDate,
+        device: 'InBody 770',
+        inbody_score: scannedData.scores.inBodyScore,
+        vfl: scannedData.scores.visceralFatLevel,
+        visceral_fat_level: scannedData.scores.visceralFatLevel,
+        bfm_kg: scannedData.bodyComposition.bodyFatMass,
+        lean_ra_kg: scannedData.segmentalLean.rightArm,
+        lean_la_kg: scannedData.segmentalLean.leftArm,
+        lean_trunk_kg: scannedData.segmentalLean.trunk,
+        lean_rl_kg: scannedData.segmentalLean.rightLeg,
+        lean_ll_kg: scannedData.segmentalLean.leftLeg,
+        segmental_data: {
+          right_arm: { muscle_kg: scannedData.segmentalLean.rightArm, pct: scannedData.segmentalLean.rightArmPct },
+          left_arm: { muscle_kg: scannedData.segmentalLean.leftArm, pct: scannedData.segmentalLean.leftArmPct },
+          trunk: { muscle_kg: scannedData.segmentalLean.trunk, pct: scannedData.segmentalLean.trunkPct },
+          right_leg: { muscle_kg: scannedData.segmentalLean.rightLeg, pct: scannedData.segmentalLean.rightLegPct },
+          left_leg: { muscle_kg: scannedData.segmentalLean.leftLeg, pct: scannedData.segmentalLean.leftLegPct },
+        }
+      };
+
+      const rawPath = `inbody_scan_${user.id}_${Date.now()}`;
+      const response = await fetch(`${apiBaseUrl}/api/inbody/save-result`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          raw_path: rawPath,
+          result: inbodyData,
+        }),
+      });
+
+      if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        try {
+          const errorBody = await response.json();
+          message = errorBody?.detail || message;
+        } catch {
+          message = await response.text() || message;
+        }
+        throw new Error(message);
+      }
+
+      toast.success('InBody results saved to your profile');
+    } catch (error) {
+      console.error('[InBodyPage] Save error:', error);
+      const message = error instanceof Error ? error.message : 'Error saving InBody results';
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -319,8 +401,20 @@ const InBodyPage = () => {
                         </CardContent>
                     </Card>
 
-                    <Button className="w-full gap-2 bg-gradient-primary shadow-glow" onClick={() => console.log('Saving to profile...')}>
-                         <CheckCircle2 className="w-4 h-4" /> Save to Profile
+                    <Button
+                      className="w-full gap-2 bg-gradient-primary shadow-glow"
+                      onClick={handleSaveToProfile}
+                      disabled={saving || !user}
+                    >
+                      {saving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" /> Save to Profile
+                        </>
+                      )}
                     </Button>
                 </div>
             </div>

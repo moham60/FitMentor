@@ -8,11 +8,13 @@ in the FitMentor schema.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 
 from cache_layer import USER_CONTEXT_TTL, _cache_key_user_context, get_cache_manager
-from supabase_client import fetch_all_user_tables
+from supabase_client import fetch_all_user_tables, fetch_table
+from page_documentation import get_all_pages_summary
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ class StructuredContext:
     food_library_block: str = ""
     social_block: str = ""
     messages_block: str = ""
+    pages_documentation_block: str = ""
     raw_tables_block: str = ""
     has_data: bool = False
 
@@ -57,6 +60,7 @@ class StructuredContext:
             ("Food Library", self.food_library_block),
             ("Social Activity", self.social_block),
             ("Direct Messages", self.messages_block),
+            ("FitMentor Pages & Features", self.pages_documentation_block),
             ("Database Coverage", self.raw_tables_block),
         ]
         parts = [f"## {title}\n{block}" for title, block in sections if block]
@@ -90,6 +94,9 @@ async def build_user_context(user_id: str) -> StructuredContext:
     ctx = StructuredContext(user_id=user_id)
 
     try:
+        # Include page documentation for all users
+        ctx.pages_documentation_block = get_all_pages_summary()
+
         db = await fetch_all_user_tables(user_id)
         food_lookup = _lookup(db.get("food_items", []), "id")
         exercise_lookup = _lookup(db.get("exercise_library", []), "id")
@@ -173,6 +180,7 @@ async def build_user_context(user_id: str) -> StructuredContext:
                 "food_library_block",
                 "social_block",
                 "messages_block",
+                "pages_documentation_block",
             )
         )
         logger.info("[ContextBuilder] Built context for %s (has_data=%s)", user_id, ctx.has_data)
@@ -191,8 +199,273 @@ async def build_context_from_profile(profile: dict, user_id: Optional[str] = Non
     return ctx
 
 
+async def build_recent_conversation_memory(
+    user_id: str,
+    conversation_id: Optional[str] = None,
+    current_query: Optional[str] = None,
+    *,
+    conversation_limit: int = 3,
+    messages_per_conversation: int = 4,
+) -> str:
+    """Build a compact memory block from the user's recent chatbot conversations."""
+    conversations = await fetch_table(
+        "chatbot_conversations",
+        filters={"user_id": f"eq.{user_id}"},
+        select="id,title,updated_at",
+        order="updated_at.desc",
+        limit=conversation_limit,
+    )
+
+    if not conversations:
+        return ""
+
+    if conversation_id:
+        current = next((row for row in conversations if row.get("id") == conversation_id), None)
+        if current:
+            conversations = [current] + [row for row in conversations if row.get("id") != conversation_id]
+
+    sections: list[str] = []
+    for conversation in conversations[:conversation_limit]:
+        messages = await fetch_table(
+            "chatbot_messages",
+            filters={"conversation_id": f"eq.{conversation.get('id')}"},
+            select="role,content,created_at",
+            order="created_at.desc",
+            limit=messages_per_conversation,
+        )
+        if not messages:
+            continue
+
+        if current_query and messages:
+            latest_message = messages[0]
+            latest_content = _normalize_message_text(latest_message.get("content") or "").lower()
+            query_text = _normalize_message_text(current_query).lower()
+            if latest_message.get("role") == "user" and latest_content == query_text:
+                messages = messages[1:]
+                if not messages:
+                    continue
+
+        ordered_messages = list(reversed(messages))
+        title = (conversation.get("title") or "New chat").strip() or "New chat"
+        sections.append(f"Conversation: {title} | updated: {conversation.get('updated_at')}")
+
+        for message in ordered_messages:
+            role = (message.get("role") or "message").strip()
+            content = _normalize_message_text(message.get("content") or "")
+            if not content:
+                continue
+            sections.append(f"- {role}: {content}")
+
+    return "\n".join(sections)
+
+
+async def build_persistent_user_memory(
+    user_id: str,
+    current_query: Optional[str] = None,
+    *,
+    conversation_limit: int = 20,
+    messages_per_conversation: int = 8,
+) -> str:
+    """Build a long-term memory summary from the user's prior chatbot history."""
+    conversations = await fetch_table(
+        "chatbot_conversations",
+        filters={"user_id": f"eq.{user_id}"},
+        select="id,title,updated_at",
+        order="updated_at.desc",
+        limit=conversation_limit,
+    )
+
+    if not conversations:
+        return ""
+
+    conversation_messages: list[tuple[str, list[dict]]] = []
+    for conversation in conversations:
+        messages = await fetch_table(
+            "chatbot_messages",
+            filters={"conversation_id": f"eq.{conversation.get('id')}"},
+            select="role,content,created_at",
+            order="created_at.asc",
+            limit=messages_per_conversation,
+        )
+        if messages:
+            conversation_messages.append((conversation.get("title") or "New chat", messages))
+
+    snapshot = summarize_persistent_memory_from_conversations(
+        conversation_messages,
+        current_query=current_query,
+    )
+
+    if not snapshot:
+        return ""
+
+    return snapshot
+
+
+def summarize_persistent_memory_from_conversations(
+    conversation_messages: list[tuple[str, list[dict]]],
+    current_query: Optional[str] = None,
+) -> str:
+    facts: list[str] = []
+    snippets: list[str] = []
+    seen_facts: set[str] = set()
+    seen_snippets: set[str] = set()
+
+    current_query_norm = _normalize_message_text(current_query or "").lower() if current_query else ""
+
+    for title, messages in conversation_messages:
+        if not messages:
+            continue
+
+        for message in messages:
+            content = _normalize_message_text(message.get("content") or "")
+            if not content:
+                continue
+
+            if current_query_norm and message.get("role") == "user":
+                if current_query_norm == content.lower():
+                    continue
+
+            extracted_facts = _extract_memory_facts(content)
+            for fact in extracted_facts:
+                if fact not in seen_facts:
+                    seen_facts.add(fact)
+                    facts.append(fact)
+
+            if _is_memory_relevant(content):
+                snippet_key = content.lower()
+                if snippet_key not in seen_snippets:
+                    seen_snippets.add(snippet_key)
+                    snippets.append(content)
+
+        # Add a compact conversation label when there is meaningful history.
+        if snippets and title and title.strip():
+            label = f"Conversation topic: {title.strip()}"
+            if label not in seen_snippets:
+                seen_snippets.add(label)
+                snippets.append(label)
+
+    if not facts and not snippets:
+        return ""
+
+    lines = ["Persistent memory summary:"]
+    if facts:
+        lines.append("Important user facts:")
+        lines.extend(f"- {fact}" for fact in facts[:25])
+    if snippets:
+        lines.append("Relevant prior chat snippets:")
+        lines.extend(f"- {snippet}" for snippet in snippets[:15])
+    return "\n".join(lines)
+
+
 def _lookup(rows: list[dict], key: str) -> dict:
     return {row.get(key): row for row in rows if row.get(key)}
+
+
+def _normalize_message_text(text: str, limit: int = 220) -> str:
+    text = " ".join(text.replace("\n", " ").split())
+    if len(text) > limit:
+        return text[:limit].rstrip() + "..."
+    return text
+
+
+def _is_memory_relevant(text: str) -> bool:
+    lowered = text.lower()
+    return any(keyword in lowered for keyword in _MEMORY_RELEVANT_KEYWORDS)
+
+
+def _extract_memory_facts(text: str) -> list[str]:
+    lowered = text.lower()
+    facts: list[str] = []
+
+    # Quick substring checks for common Arabic terms that may not be
+    # consistently captured by word-boundary regexes across environments.
+    if any(a in lowered for a in ("مرض السكري", "مريض سكري", "سكري", "سكر")):
+        facts.append("User mentioned diabetes or blood sugar concerns")
+
+    for pattern, label in _MEMORY_FACT_PATTERNS:
+        if pattern.search(lowered):
+            facts.append(label)
+
+    age_match = re.search(r"\b(\d{1,2})\s*(?:yo|years? old|سنة|عام)\b", lowered)
+    if age_match:
+        facts.append(f"User age mentioned: {age_match.group(1)}")
+
+    weight_match = re.search(r"\b(\d{2,3}(?:\.\d+)?)\s*(?:kg|kilos?|كيلو|كجم)\b", lowered)
+    if weight_match:
+        facts.append(f"Body weight mentioned: {weight_match.group(1)} kg")
+
+    height_match = re.search(r"\b(\d{2,3}(?:\.\d+)?)\s*(?:cm|centimeters?|سم)\b", lowered)
+    if height_match:
+        facts.append(f"Height mentioned: {height_match.group(1)} cm")
+
+    calories_match = re.search(r"\b(\d{3,4})\s*(?:calories|kcal|سعر(?:ة|ات))\b", lowered)
+    if calories_match:
+        facts.append(f"Target calories mentioned: {calories_match.group(1)}")
+
+    medication_match = re.search(r"\b(metformin|insulin|ozempic|glucophage|lantus|novorapid|humalog|statin|bp meds|blood pressure meds)\b", lowered)
+    if medication_match:
+        facts.append(f"Medication mentioned: {medication_match.group(1)}")
+
+    condition_match = re.search(r"\b(diabetes|prediabetes|high blood pressure|hypertension|asthma|pcos|thyroid|cholesterol)\b", lowered)
+    if condition_match:
+        facts.append(f"Health condition mentioned: {condition_match.group(1)}")
+
+    goal_match = re.search(r"\b(losing fat|lose fat|fat loss|build muscle|gain muscle|bulk|cut|maintain weight)\b", lowered)
+    if goal_match:
+        facts.append(f"Goal mentioned: {goal_match.group(1)}")
+
+    restriction_match = re.search(r"\b(allergic to|allergy to|avoid|can't eat|cannot eat|don't eat|no sugar|low sugar|low carb|no dairy|no gluten)\b.{0,40}", lowered)
+    if restriction_match:
+        facts.append("Nutrition restriction or food preference mentioned")
+
+    if re.search(r"\bvegan\b", lowered):
+        facts.append("User prefers a vegan diet")
+    if re.search(r"\bvegetarian\b", lowered):
+        facts.append("User prefers a vegetarian diet")
+    if re.search(r"\bdiabetic\b", lowered):
+        facts.append("User has diabetes-related dietary needs")
+
+    return facts
+
+
+_MEMORY_RELEVANT_KEYWORDS = [
+    "diabetes",
+    "diabetic",
+    "blood sugar",
+    "sugar disease",
+    "سكري",
+    "سكر",
+    "hypertension",
+    "prediabetes",
+    "pressure",
+    "ضغط",
+    "injury",
+    "pain",
+    "knee",
+    "back",
+    "allergy",
+    "allergic",
+    "vegan",
+    "medication",
+    "medicine",
+    "أدوية",
+    "workout",
+    "diet",
+    "meal",
+    "exercise",
+    "goal",
+]
+
+_MEMORY_FACT_PATTERNS = [
+    (re.compile(r"\b(diabetes|type 1 diabetes|type 2 diabetes|prediabetes|blood sugar|sugar disease|سكري|سكر|ارتفاع السكر)\b", re.IGNORECASE), "User mentioned diabetes or blood sugar concerns"),
+    (re.compile(r"\b(hypertension|high blood pressure|blood pressure|ضغط|ضغط دم|pressure)\b", re.IGNORECASE), "User mentioned high blood pressure or hypertension"),
+    (re.compile(r"\b(knee pain|back pain|shoulder pain|injury|tendon|ligament|arthritis|sprain|shoulder impingement|disc)\b", re.IGNORECASE), "User mentioned pain or an injury that may affect exercise selection"),
+    (re.compile(r"\b(allergy|allergic|lactose intolerance|gluten free|celiac|avoid sugar|no sugar|low sugar|low carb|keto)\b", re.IGNORECASE), "User mentioned a food allergy or dietary restriction"),
+    (re.compile(r"\b(weight loss|lose weight|fat loss|burn fat|cutting|lean down|lose fat)\b", re.IGNORECASE), "User's goal appears to be fat loss or weight loss"),
+    (re.compile(r"\b(muscle gain|build muscle|gain muscle|bulk|hypertrophy|increase muscle)\b", re.IGNORECASE), "User's goal appears to be muscle gain"),
+    (re.compile(r"\b(endurance|stamina|cardio|conditioning|fitness)\b", re.IGNORECASE), "User mentioned endurance or cardio improvement"),
+    (re.compile(r"\b(vegan|vegetarian|high protein|low carb|keto|intermittent fasting|low sugar|diabetic diet)\b", re.IGNORECASE), "User mentioned a diet style or macro preference"),
+]
 
 
 def _format_profile(p: dict) -> str:
@@ -233,7 +506,7 @@ def _format_inbody(i: dict) -> str:
 
 def _format_inbody_results(results: list[dict]) -> str:
     lines = []
-    for row in results[:3]:
+    for row in results:
         result = row.get("result") or {}
         summary = ", ".join(f"{k}: {v}" for k, v in list(result.items())[:8])
         lines.append(f"- {row.get('created_at')} | raw_path: {row.get('raw_path')} | {summary}")

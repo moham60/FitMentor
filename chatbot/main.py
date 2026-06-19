@@ -6,24 +6,27 @@ Phase 6: FastAPI Production Backend
 import logging
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables FIRST before importing modules that use them
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pathlib import Path
-from dotenv import load_dotenv
 
 from chat import router as chat_router
 from user import router as user_router
 from recommendation import router as recommendation_router
+from model2_router import router as model2_router
+from inbody_handler import router as inbody_router
 from vector_store import VectorStoreManager
 from engine import get_rag_engine
 from ingestion import sync_site_knowledge
 from ingestion_spa import routes_from_env, sync_spa_routes
 from supabase_client import close_http_client
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 
 logging.basicConfig(
     level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
@@ -144,6 +147,8 @@ logger.info(
 app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
 app.include_router(user_router, prefix="/api/user", tags=["User"])
 app.include_router(recommendation_router, prefix="/api/recommendation", tags=["Recommendation"])
+app.include_router(model2_router, prefix="/api/model2", tags=["Workout Generation"])
+app.include_router(inbody_router, prefix="/api/inbody", tags=["InBody Results"])
 
 
 @app.get("/api/health")
@@ -174,5 +179,5 @@ if __name__ == "__main__":
         "main:app",
         host=os.getenv("HOST", "127.0.0.1"),
         port=int(os.getenv("PORT", "8000")),
-        reload=True,
+        reload=False,
     )

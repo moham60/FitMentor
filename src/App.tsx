@@ -33,6 +33,7 @@ import ChatPage from "./pages/ChatPage";
 import ChatNotificationsListener from "./components/chat/ChatNotificationsListener";
 import SubscriptionPage from "./userPages/SubscriptionPage";
 import CheckoutPage from "./userPages/CheckoutPage";
+import SessionPage from "./userPages/SessionPage";
 
 const queryClient = new QueryClient();
 
@@ -262,6 +263,17 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <OnboardingGate>
               <WorkoutsPage />
+            </OnboardingGate>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/session/:sessionId"
+        element={
+          <ProtectedRoute>
+            <OnboardingGate>
+              <SessionPage />
             </OnboardingGate>
           </ProtectedRoute>
         }

@@ -12,7 +12,6 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
-import { NavType } from '@/types/navLinks';
 import { coachNavItems, userNavItems } from '@/lib/NavLinks';
 
 
