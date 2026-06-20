@@ -175,6 +175,8 @@ def preprocess_user(
     equipment:    list[str] | None = None,
     age:          int = 25,
     gender:       str = "male",
+    injury_severity: int = 0,
+    injury_locations: list[str] | None = None,
     inbody_row:   dict | None = None,
 ) -> dict:
     """
@@ -223,6 +225,8 @@ def preprocess_user(
     gender = gender.lower().strip()
     target_muscles = [m.lower().strip() for m in (target_muscles or [])]
     equipment      = [e.lower().strip() for e in (equipment or [])]
+    injury_locations = [m.lower().strip() for m in (injury_locations or [])]
+    injury_severity = int(np.clip(injury_severity, 0, 3))
 
     _validate(goal,       "goal",       VALID_GOALS)
     _validate(experience, "experience", VALID_EXPERIENCE)
@@ -232,6 +236,8 @@ def preprocess_user(
         _validate(m, "muscle", VALID_MUSCLES)
     for eq in equipment:
         _validate(eq, "equipment", VALID_EQUIPMENT)
+    for m in injury_locations:
+        _validate(m, "injury location", VALID_MUSCLES)
 
     # ── Normalise numerics ───────────────────────────────────────────────────
     norm = {
@@ -280,6 +286,8 @@ def preprocess_user(
         "experience":     experience,
         "target_muscles": target_muscles,
         "equipment":      equipment,
+        "injury_severity": injury_severity,
+        "injury_locations": injury_locations,
         "raw": {
             "weight_kg":   weight_kg,
             "pbf_percent": pbf_percent,
@@ -287,7 +295,8 @@ def preprocess_user(
             "height_cm":   height_cm,
             "age":         age,
             "gender":      gender,
+            "injury_severity": injury_severity,
+            "injury_locations": injury_locations,
             "inbody_row":  dict(inbody_row or {}),
         },
     }
-

@@ -17,14 +17,15 @@ import json
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from cache_layer import get_cache_manager, _cache_key_workout_routine, _cache_key_workout_routines_index
-from supabase_client import insert_user_workout_session
-from supabase_client import fetch_table_first_by_id, update_user_workout_session_by_id
-from supabase_client import (
+from cache_layer import get_cache_manager
+from supabase import fetch_table_first_by_id
+from supabase import (
     fetch_workout_routines,
     fetch_workout_routine,
     insert_workout_routine,
     update_workout_routine_by_id,
+    insert_user_workout_session,
+    update_user_workout_session_by_id,
 )
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -39,6 +40,14 @@ from preprocessing import VALID_EQUIPMENT, VALID_GOALS, VALID_MUSCLES  # type: i
 logger = logging.getLogger(__name__)
 router = APIRouter()
 ROUTINE_TTL_SECONDS = int(os.getenv("MODEL2_ROUTINE_TTL_SECONDS", str(60 * 60 * 24 * 30)))
+
+
+def _cache_key_workout_routine(routine_id: str) -> str:
+    return f"workout:routine:{routine_id}"
+
+
+def _cache_key_workout_routines_index(user_id: Optional[str] = None) -> str:
+    return f"workout:routines:index:{user_id or 'anonymous'}"
 
 
 GOAL_ALIASES = {
@@ -115,6 +124,8 @@ class WorkoutRequest(BaseModel):
     target_muscles: list[str] = Field(default_factory=list)
     num_exercises: Optional[int] = Field(default=None, ge=1, le=12)
     n_exercises: Optional[int] = Field(default=None, ge=1, le=12)
+    injury_severity: int = Field(default=0, ge=0, le=3)
+    injury_locations: list[str] = Field(default_factory=list)
 
     @field_validator("equipment", "target_muscles")
     @classmethod
@@ -260,6 +271,7 @@ async def recommend_workout(req: WorkoutRequest):
     experience = _normalize_experience(req)
     equipment = _normalize_list(req.equipment, EQUIPMENT_ALIASES, VALID_EQUIPMENT, "equipment")
     target_muscles = _normalize_list(req.target_muscles, MUSCLE_ALIASES, VALID_MUSCLES, "muscle")
+    injury_locations = _normalize_list(req.injury_locations, MUSCLE_ALIASES, VALID_MUSCLES, "injury location") if req.injury_locations else []
     pbf_percent = _estimate_body_fat(req)
     smm_kg = _estimate_muscle_mass(req, pbf_percent)
     n_exercises = req.n_exercises or req.num_exercises or 6
@@ -274,6 +286,8 @@ async def recommend_workout(req: WorkoutRequest):
             experience=experience,
             target_muscles=target_muscles,
             equipment=equipment,
+            injury_severity=req.injury_severity,
+            injury_locations=injury_locations,
             n_exercises=n_exercises,
         )
     except ValueError as exc:

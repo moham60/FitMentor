@@ -83,6 +83,8 @@ def assemble_plan(
     height_cm  = user_data["raw"]["height_cm"]
     age        = user_data["raw"].get("age", 25)  # default 25 if not provided
     gender     = user_data["raw"].get("gender", "male")
+    injury_severity = int(user_data["raw"].get("injury_severity", user_data.get("injury_severity", 0)))
+    injury_locations = set(user_data["raw"].get("injury_locations", user_data.get("injury_locations", [])) or [])
     smm_kg     = user_data["raw"]["smm_kg"]
     pbf        = user_data["raw"]["pbf_percent"]
     target_muscles = user_data.get("target_muscles", [])
@@ -113,6 +115,10 @@ def assemble_plan(
         )
 
         bwp = ex.get("base_weight_pct", 0.0)
+        effective_injury_severity = injury_severity
+        if injury_locations:
+            effective_injury_severity = injury_severity if injury_locations.intersection(set(ex_muscles)) else 0
+
         prescription =adjuster.predict(
             weight_kg=weight_kg, height_cm=height_cm, age=age, gender=gender,
             pbf_percent=pbf, smm_kg=smm_kg, bmr_kcal=bmr_kcal,
@@ -121,6 +127,7 @@ def assemble_plan(
             target_muscles=ex_muscles, inbody_row=inbody_details,
             goal=goal, experience=experience, is_compound=is_compound,
             total_exercises_in_workout=total_exercises,
+            injury_severity=effective_injury_severity,
             base_wt_pct=bwp,
         )
         final_sets = int(prescription["recommended_sets"])
@@ -157,6 +164,8 @@ def assemble_plan(
             "height_cm":   height_cm,
             "age":         age,
             "gender":      gender,
+            "injury_severity": injury_severity,
+            "injury_locations": sorted(injury_locations),
         },
         goal       = goal,
         experience = experience,

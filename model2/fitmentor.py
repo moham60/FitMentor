@@ -83,6 +83,8 @@ class FitMentor:
         equipment:      list[str],
         age:            int = 25,
         gender:         str = "male",
+        injury_severity:int = 0,
+        injury_locations:list[str] | None = None,
         inbody_row:     dict | None = None,
         n_exercises:    int = 6,
         parallel:       bool = True,
@@ -104,6 +106,8 @@ class FitMentor:
             goal=goal,           experience=experience,
             target_muscles=target_muscles, equipment=equipment,
             age=age,             gender=gender,
+            injury_severity=injury_severity,
+            injury_locations=injury_locations,
             inbody_row=inbody_row,
         )
 
@@ -141,6 +145,8 @@ class FitMentor:
         height_cm:   float,
         age:         int = 25,
         gender:      str = "male",
+        injury_severity: int = 0,
+        injury_locations: list[str] | None = None,
     ) -> WorkoutPlan:
         """
         Lightweight update: only re-scores existing exercises + nearby
@@ -157,6 +163,8 @@ class FitMentor:
             goal=old["goal"],           experience=old["experience"],
             target_muscles=old["target_muscles"], equipment=old["equipment"],
             age=age,             gender=gender,
+            injury_severity=injury_severity,
+            injury_locations=injury_locations,
             inbody_row=old_inbody_row,
         )
 

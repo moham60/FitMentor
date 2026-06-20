@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from chat import router as chat_router
 from user import router as user_router
 from recommendation import router as recommendation_router
+from model2_router import router as model2_router
 from vector_store import VectorStoreManager
 from engine import get_rag_engine
 from ingestion import sync_site_knowledge
@@ -144,6 +145,7 @@ logger.info(
 app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
 app.include_router(user_router, prefix="/api/user", tags=["User"])
 app.include_router(recommendation_router, prefix="/api/recommendation", tags=["Recommendation"])
+app.include_router(model2_router, prefix="/api/model2", tags=["Workout Generation"])
 
 
 @app.get("/api/health")

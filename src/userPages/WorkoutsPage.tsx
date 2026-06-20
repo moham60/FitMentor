@@ -45,6 +45,13 @@ const GOALS = [
   { value: "Maintain", label: "Maintain Weight", color: "text-orange-500", bg: "bg-orange-500/10" }
 ];
 
+const INJURY_LEVELS = [
+  { value: 0, label: "No Injury" },
+  { value: 1, label: "Mild Injury" },
+  { value: 2, label: "Moderate Injury" },
+  { value: 3, label: "Severe Injury" }
+];
+
 // Mock Data for User Profile (Ideally fetched from Supabase)
 const MOCK_USER_PROFILE = {
   age: 24,
@@ -52,7 +59,9 @@ const MOCK_USER_PROFILE = {
   height_cm: 178,
   weight_kg: 75,
   activity_level: "Moderately Active",
-  primary_goal: "Build Muscle"
+  primary_goal: "Build Muscle",
+  injury_severity: 0,
+  injury_locations: [] as string[]
 };
 
 const WorkoutGenerator = () => {
@@ -72,7 +81,9 @@ const WorkoutGenerator = () => {
     primary_goal: "Build Muscle",
     equipment: [] as string[],
     target_muscles: [] as string[],
-    num_exercises: 6
+    num_exercises: 6,
+    injury_severity: 0,
+    injury_locations: [] as string[]
   });
 
   // Metadata from API
@@ -97,7 +108,7 @@ const WorkoutGenerator = () => {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
-  const toggleSelection = (key: 'equipment' | 'target_muscles', item: string) => {
+  const toggleSelection = (key: 'equipment' | 'target_muscles' | 'injury_locations', item: string) => {
     setFormData(prev => {
       const current = prev[key];
       const updated = current.includes(item)
@@ -124,12 +135,14 @@ const WorkoutGenerator = () => {
       ...MOCK_USER_PROFILE,
       equipment: formData.equipment,
       target_muscles: formData.target_muscles,
-      num_exercises: formData.num_exercises
+      num_exercises: formData.num_exercises,
+      injury_severity: formData.injury_severity,
+      injury_locations: formData.injury_locations
     } : formData;
 
     try {
       // 1. Call the API
-      const response = await fetch('http://localhost:8000/recommend', {
+      const response = await fetch('http://127.0.0.1:8000/api/model2/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -263,6 +276,43 @@ const WorkoutGenerator = () => {
                   </div>
 
                   <div className="space-y-2">
+                    <Label>Injury Level</Label>
+                    <Select
+                      value={String(formData.injury_severity)}
+                      onValueChange={(v) => updateForm('injury_severity', Number(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INJURY_LEVELS.map(level => (
+                          <SelectItem key={level.value} value={String(level.value)}>
+                            {level.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {formData.injury_severity > 0 && (
+                    <div className="space-y-3">
+                      <Label>Injury Location</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {availableMuscles.map(m => (
+                          <Badge
+                            key={m}
+                            variant={formData.injury_locations.includes(m) ? 'default' : 'outline'}
+                            className="cursor-pointer hover:opacity-80 transition-all py-1.5"
+                            onClick={() => toggleSelection('injury_locations', m)}
+                          >
+                            {m}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
                     <Label>Gender</Label>
                     <div className="flex gap-2">
                       <Button 
@@ -299,9 +349,62 @@ const WorkoutGenerator = () => {
                       <span className="text-muted-foreground">Activity:</span>
                       <span className="font-bold">{MOCK_USER_PROFILE.activity_level}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Injury Level:</span>
+                      <span className="font-bold">
+                        {INJURY_LEVELS.find(level => level.value === formData.injury_severity)?.label}
+                      </span>
+                    </div>
+                    {formData.injury_severity > 0 && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Injury Location:</span>
+                        <span className="font-bold text-right">
+                          {formData.injury_locations.length > 0 ? formData.injury_locations.join(', ') : 'All selected muscles'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>
+
+              {mode === 'me' && (
+                <div className="space-y-2">
+                  <Label>Injury Level</Label>
+                  <Select
+                    value={String(formData.injury_severity)}
+                    onValueChange={(v) => updateForm('injury_severity', Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INJURY_LEVELS.map(level => (
+                        <SelectItem key={level.value} value={String(level.value)}>
+                          {level.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {mode === 'me' && formData.injury_severity > 0 && (
+                <div className="space-y-3">
+                  <Label>Injury Location</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableMuscles.map(m => (
+                      <Badge
+                        key={m}
+                        variant={formData.injury_locations.includes(m) ? 'default' : 'outline'}
+                        className="cursor-pointer hover:opacity-80 transition-all py-1.5"
+                        onClick={() => toggleSelection('injury_locations', m)}
+                      >
+                        {m}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Common Inputs */}
               <div className="space-y-3 pt-4 border-t">
