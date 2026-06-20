@@ -10,7 +10,8 @@ import {
   BarChart3,
   Target,
   BicepsFlexed,
-  ClipboardList
+  ClipboardList,
+  Camera // <-- استدعينا الأيقونة هنا
 } from "lucide-react";
 import { NavType } from "@/types/navLinks";
 
@@ -21,7 +22,8 @@ export const userNavItems: NavType[] = [
   { icon: Utensils, label: "Nutrition", path: "/nutrition" },
   { icon: Dumbbell, label: "Workouts", path: "/workouts" },
   { icon: BarChart3, label: "InBody", path: "/inbody" },
-   { icon: MdPostAdd, label: "Posts", path: "/posts" },  
+  { icon: Camera, label: "Train Counter", path: "/count-train" }, // <-- ضفنا الرابط بتاعك هنا
+  { icon: MdPostAdd, label: "Posts", path: "/posts" },  
   { icon: Sparkles, label: "AI Assistant", path: "/ai-assistant" },
   // { icon: Target, label: "Goals", path: "/goals" },
   { icon: User, label: "Profile", path: "/profile" },

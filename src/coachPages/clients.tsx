@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageSquare, ArrowUpRight, User, Loader2 } from "lucide-react";
+import { MessageSquare, ArrowUpRight, User as UserIcon, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -22,86 +22,93 @@ export default function Clients() {
     const navigate = useNavigate();
     const { user } = useAuth();
 
+    const sb = supabase as any;
+
     useEffect(() => {
-        if (!user) return;
+        if (!user?.id) return;
 
         const fetchClients = async () => {
             try {
                 setLoading(true);
                 setError(null);
 
-                // جلب جميع الخطط الخاصة بهذا الكوتش
-                const { data: coachPlans, error: plansError } = await supabase
+                // 1) جلب جميع الخطط التي أنشأها هذا الكابتن فقط
+                const { data: myPlans, error: plansErr } = await sb
                     .from('coach_plans')
-                    .select('id')
+                    .select('id, name, type, description')
                     .eq('coach_id', user.id);
 
-                if (plansError) throw plansError;
+                if (plansErr) throw plansErr;
 
-                if (!coachPlans || coachPlans.length === 0) {
+                if (!myPlans || myPlans.length === 0) {
                     setClients([]);
-                    setLoading(false);
                     return;
                 }
 
-                const planIds = coachPlans.map(plan => plan.id);
+                const myPlanIds = myPlans.map((p: any) => p.id);
+                
+                // ✅ التعديل 1: إخبار TypeScript صراحة بنوع بيانات الـ Map
+                const planMap = new Map<string, any>(myPlans.map((p: any) => [p.id, p]));
 
-                // جلب جميع المستخدمين المشتركين في خطط هذا الكوتش
-                const { data: subscribedUsers, error: usersError } = await supabase
+                // 2) البحث عن المتدربين المشتركين في هذه الخطط
+                const { data: subscribedUsers, error: usersErr } = await sb
                     .from('profiles')
-                    .select(`
-                        id,
-                        user_id,
-                        full_name,
-                        avatar_url,
-                        coach_plan_id,
-                        coach_plan_status,
-                        coach_plan_started_at,
-                        coach_plan_expires_at,
-                        coach_plans!profiles_coach_plan_id_fkey (
-                            name,
-                            type,
-                            description
-                        )
-                    `)
-                    .in('coach_plan_id', planIds)
-                    .eq('coach_plan_status', 'active');
+                    .select('id, user_id, full_name, avatar_url, coach_plan_id, coach_plan_status, coach_plan_started_at, coach_plan_expires_at')
+                    .eq('coach_plan_status', 'active')
+                    .in('coach_plan_id', myPlanIds);
 
-                if (usersError) throw usersError;
+                if (usersErr) throw usersErr;
 
-                // تحويل البيانات إلى format المطلوب
-                const formattedClients: Client[] = (subscribedUsers || []).map((profile: any) => {
-                    // حساب Progress بناءً على الأيام المتبقية
-                    const startDate = new Date(profile.coach_plan_started_at);
-                    const expiryDate = new Date(profile.coach_plan_expires_at);
-                    const today = new Date();
-                    const totalDays = Math.floor((expiryDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                    const daysElapsed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                    const progress = totalDays > 0 ? Math.min(Math.round((daysElapsed / totalDays) * 100), 100) : 0;
+                if (!subscribedUsers || subscribedUsers.length === 0) {
+                    setClients([]);
+                    return;
+                }
 
-                    // تحويل avatar_url إلى URL كامل إذا كان مسار في Storage
-                    let avatarUrl = profile.avatar_url;
-                    if (avatarUrl && !avatarUrl.startsWith('http')) {
-                        const { data: publicUrlData } = supabase.storage
-                            .from('avatars')
-                            .getPublicUrl(avatarUrl);
-                        avatarUrl = publicUrlData.publicUrl;
-                    }
+                // 3) تنسيق البيانات
+                const formattedClients: Client[] = await Promise.all(
+                    subscribedUsers.map(async (prof: any) => {
+                        // ✅ التعديل 2: إجبار المترجم على معاملة الخطة كـ any
+                        const plan = planMap.get(prof.coach_plan_id) as any;
+                        const startDate = prof.coach_plan_started_at ? new Date(prof.coach_plan_started_at) : null;
+                        const expiryDate = prof.coach_plan_expires_at ? new Date(prof.coach_plan_expires_at) : null;
 
-                    return {
-                        id: profile.id,
-                        user_id: profile.user_id,
-                        name: profile.full_name || 'User',
-                        avatar_url: avatarUrl,
-                        plan_name: profile.coach_plans?.name || 'Undefined Plan',
-                        plan_type: profile.coach_plans?.type || 'basic',
-                        plan_description: profile.coach_plans?.description,
-                        plan_status: profile.coach_plan_status,
-                        plan_started_at: profile.coach_plan_started_at,
-                        plan_expires_at: profile.coach_plan_expires_at,
-                        progress
-                    };
-                });
+                        const progress = (startDate && expiryDate)
+                            ? (() => {
+                                const today = new Date();
+                                const totalDays = Math.floor((expiryDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                                const daysElapsed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                                if (totalDays <= 0) return 0;
+                                return Math.min(Math.max(Math.round((daysElapsed / totalDays) * 100), 0), 100);
+                            })()
+                            : 0;
+
+                        let avatarUrl = prof.avatar_url;
+                        if (avatarUrl && !avatarUrl.startsWith('http')) {
+                            try {
+                                const { data } = await supabase.storage
+                                    .from('avatars')
+                                    .createSignedUrl(avatarUrl, 60 * 60);
+                                avatarUrl = data?.signedUrl || null;
+                            } catch {
+                                avatarUrl = null;
+                            }
+                        }
+
+                        return {
+                            id: prof.id,
+                            user_id: prof.user_id,
+                            name: prof.full_name || 'Member',
+                            avatar_url: avatarUrl,
+                            plan_name: plan?.name || 'Coach Plan',
+                            plan_type: plan?.type || 'basic',
+                            plan_description: plan?.description || '',
+                            plan_status: prof.coach_plan_status || 'active',
+                            plan_started_at: prof.coach_plan_started_at || '',
+                            plan_expires_at: prof.coach_plan_expires_at || '',
+                            progress
+                        };
+                    })
+                );
 
                 setClients(formattedClients);
             } catch (err: any) {
@@ -113,9 +120,8 @@ export default function Clients() {
         };
 
         fetchClients();
-    }, [user]);
+    }, [user?.id]);
 
-    // عرض حالة التحميل
     if (loading) {
         return (
             <MainLayout title="Clients Management">
@@ -126,7 +132,6 @@ export default function Clients() {
         );
     }
 
-    // عرض الخطأ
     if (error) {
         return (
             <MainLayout title="Clients Management">
@@ -140,13 +145,12 @@ export default function Clients() {
         );
     }
 
-    // عرض رسالة عدم وجود عملاء
     if (clients.length === 0) {
         return (
             <MainLayout title="Clients Management">
                 <div className="flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
-                        <User className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                        <UserIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
                         <h3 className="text-xl font-semibold mb-2">No clients yet</h3>
                         <p className="text-muted-foreground">Clients will appear here when they subscribe to your plans</p>
                     </div>
@@ -163,7 +167,6 @@ export default function Clients() {
                         key={client.id} 
                         className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-slate-50 dark:from-zinc-900 dark:to-zinc-950"
                     >
-                        {/* Header: Profile & Plan Badge */}
                         <CardHeader className="p-5 pb-2">
                             <div className="flex justify-between items-start">
                                 <div className="relative">
@@ -174,7 +177,6 @@ export default function Clients() {
                                                 alt={client.name}
                                                 className="rounded-full object-cover" 
                                                 onError={(e) => {
-                                                    // في حالة فشل تحميل الصورة، استخدم الصورة الافتراضية
                                                     e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${client.name}`;
                                                 }}
                                             />
@@ -189,7 +191,6 @@ export default function Clients() {
                                             {client.name.charAt(0).toUpperCase()}
                                         </AvatarFallback>
                                     </Avatar>
-                                    {/* مؤشر الحالة النشطة */}
                                     {client.plan_status === 'active' && (
                                         <span className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-zinc-900 rounded-full"></span>
                                     )}
@@ -203,7 +204,6 @@ export default function Clients() {
                             </div>
                         </CardHeader>
 
-                        {/* Content: Name & Progress */}
                         <CardContent className="px-5 py-2">
                             <h3 className="font-bold text-lg tracking-tight group-hover:text-primary transition-colors">
                                 {client.name}
@@ -221,7 +221,6 @@ export default function Clients() {
                             </div>
                         </CardContent>
 
-                        {/* Footer: Actions */}
                         <CardFooter className="p-5 pt-4 flex gap-2">
                             <Button 
                                 onClick={() => navigate(`/chat/${client.user_id}`)} 

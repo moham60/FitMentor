@@ -26,6 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useFoodItems, usePopularFoods, getFoodCategories, FoodItem, calculateCalories, calculateMacros } from '@/hooks/useFoodItems';
 import FoodCard from '@/components/nutrition/FoodCard';
+import NutritionHistory from '@/components/nutrition/NutritionHistory';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -488,6 +489,13 @@ const NutritionPage = () => {
       title="Nutrition"
       subtitle="Track your meals and calories"
     >
+      <Tabs defaultValue="today" className="w-full">
+        <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
+          <TabsTrigger value="today">Today</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="today" className="space-y-6">
       {/* Daily Summary - Beautiful Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 animate-fade-in">
@@ -824,6 +832,14 @@ const NutritionPage = () => {
           </div>
         </div>
       </div>
+        </TabsContent>
+
+        <TabsContent value="history">
+        <div className="max-w-3xl mx-auto">
+          <NutritionHistory />
+        </div>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={suggestOpen} onOpenChange={setSuggestOpen}>
         <DialogContent className="sm:max-w-2xl">

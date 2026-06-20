@@ -822,18 +822,51 @@ export default function ChatPage() {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <TooltipProvider>
+<TooltipProvider>
+                    {/* زر المكالمة الصوتية */}
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button type="button" variant="ghost" size="icon" className="h-10 w-10 rounded-full text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-white/5">
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => {
+                            if (!activeProfile?.user_id) return;
+                            window.dispatchEvent(new CustomEvent('START_WEBRTC_CALL', {
+                              detail: { 
+                                receiverId: activeProfile.user_id, 
+                                receiverName: activeProfile.full_name || 'Member', 
+                                isVideo: false 
+                              }
+                            }));
+                          }}
+                          className="h-10 w-10 rounded-full text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-white/5"
+                        >
                           <Phone className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Audio Call</TooltipContent>
                     </Tooltip>
+
+                    {/* زر مكالمة الفيديو */}
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button type="button" variant="ghost" size="icon" className="h-10 w-10 rounded-full text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-white/5">
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => {
+                            if (!activeProfile?.user_id) return;
+                            window.dispatchEvent(new CustomEvent('START_WEBRTC_CALL', {
+                              detail: { 
+                                receiverId: activeProfile.user_id, 
+                                receiverName: activeProfile.full_name || 'Member', 
+                                isVideo: true 
+                              }
+                            }));
+                          }}
+                          className="h-10 w-10 rounded-full text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-white/5"
+                        >
                           <Video className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>

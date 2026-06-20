@@ -23,6 +23,7 @@ import WorkoutsPage from "./userPages/WorkoutsPage";
 import InBodyPage from "./userPages/InBodyPage";
 import SettingsPage from "./pages/SettingsPage";
 import ProfilePage from "./pages/ProfilePage";
+import AdminPortalPage from "./components/admin/AdminPortalPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import ClientsPage from "./coachPages/clients";
 import EarningsPage from "./coachPages/earnings";
@@ -31,9 +32,10 @@ import PostsPage from "./pages/posts";
 import ProfileByIdPage from "./pages/ProfileByIdPage";
 import ChatPage from "./pages/ChatPage";
 import ChatNotificationsListener from "./components/chat/ChatNotificationsListener";
+import CallOverlay from "./components/chat/CallOverlay";
 import SubscriptionPage from "./userPages/SubscriptionPage";
 import CheckoutPage from "./userPages/CheckoutPage";
-
+import CountTrainPage from "./userPages/CountTrainPage";
 const queryClient = new QueryClient();
 
 /**
@@ -233,7 +235,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+<Route path="/god-mode-portal" element={<AdminPortalPage />} />
       <Route
         path="/exercises"
         element={
@@ -277,7 +279,16 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+<Route
+  path="/count-train"
+  element={
+    <ProtectedRoute>
+      <OnboardingGate>
+        <CountTrainPage />
+      </OnboardingGate>
+    </ProtectedRoute>
+  }
+/>
       <Route
         path="/settings"
         element={
@@ -383,6 +394,7 @@ const AppRoutes = () => {
   );
 };
 
+// 2. انزل للأسفل عند تعريف App:
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -390,6 +402,7 @@ const App = () => (
         <AuthProvider>
           <BrowserRouter>
             <ChatNotificationsListener />
+            <CallOverlay /> {/* <--- تم زرعه هنا */}
             <AppRoutes />
           </BrowserRouter>
 
@@ -400,5 +413,4 @@ const App = () => (
     </TooltipProvider>
   </QueryClientProvider>
 );
-
 export default App;

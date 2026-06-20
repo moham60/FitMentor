@@ -55,6 +55,106 @@ export type Database = {
         Relationships: [];
       };
 
+      inbody_results: {
+        Row: {
+          created_at: string;
+          id: string;
+          raw_path: string;
+          result: {
+            weight_kg: number;
+            pbf_percent: number;
+            smm_kg: number;
+            height_cm: number;
+            bmi: number;
+            bmr_kcal: number;
+            inbody_score: number;
+            tbw_l: number;
+            protein_kg: number;
+            minerals_kg: number;
+            bfm_kg: number;
+            lean_ra_kg: number;
+            lean_la_kg: number;
+            lean_trunk_kg: number;
+            lean_rl_kg: number;
+            lean_ll_kg: number;
+            fat_ra_kg: number;
+            fat_la_kg: number;
+            fat_trunk_kg: number;
+            fat_rl_kg: number;
+            fat_ll_kg: number;
+            whr: number;
+            vfl: number;
+            test_date: string | null;
+          };
+          user_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          raw_path: string;
+          result: {
+            weight_kg: number;
+            pbf_percent: number;
+            smm_kg: number;
+            height_cm: number;
+            bmi: number;
+            bmr_kcal: number;
+            inbody_score: number;
+            tbw_l: number;
+            protein_kg: number;
+            minerals_kg: number;
+            bfm_kg: number;
+            lean_ra_kg: number;
+            lean_la_kg: number;
+            lean_trunk_kg: number;
+            lean_rl_kg: number;
+            lean_ll_kg: number;
+            fat_ra_kg: number;
+            fat_la_kg: number;
+            fat_trunk_kg: number;
+            fat_rl_kg: number;
+            fat_ll_kg: number;
+            whr: number;
+            vfl: number;
+            test_date: string | null;
+          };
+          user_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          raw_path?: string;
+          result?: {
+            weight_kg: number;
+            pbf_percent: number;
+            smm_kg: number;
+            height_cm: number;
+            bmi: number;
+            bmr_kcal: number;
+            inbody_score: number;
+            tbw_l: number;
+            protein_kg: number;
+            minerals_kg: number;
+            bfm_kg: number;
+            lean_ra_kg: number;
+            lean_la_kg: number;
+            lean_trunk_kg: number;
+            lean_rl_kg: number;
+            lean_ll_kg: number;
+            fat_ra_kg: number;
+            fat_la_kg: number;
+            fat_trunk_kg: number;
+            fat_rl_kg: number;
+            fat_ll_kg: number;
+            whr: number;
+            vfl: number;
+            test_date: string | null;
+          };
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
+
       exercise_library: {
         Row: {
           calories_per_minute: number | null;

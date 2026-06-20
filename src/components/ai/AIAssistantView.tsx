@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   AlertTriangle,
   Bot,
@@ -33,63 +31,6 @@ type Conversation = {
   created_at: string;
   updated_at: string;
 };
-
-type StoredChatMessage = {
-  id: string;
-  conversation_id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  created_at: string;
-};
-
-type ChatbotDatabase = {
-  public: {
-    Tables: {
-      chatbot_conversations: {
-        Row: Conversation;
-        Insert: {
-          id?: string;
-          user_id: string;
-          title?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          title?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      chatbot_messages: {
-        Row: StoredChatMessage;
-        Insert: {
-          id?: string;
-          conversation_id: string;
-          role: 'user' | 'assistant';
-          content: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          conversation_id?: string;
-          role?: 'user' | 'assistant';
-          content?: string;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
-    };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
-  };
-};
-
-const chatbotSupabase = supabase as unknown as SupabaseClient<ChatbotDatabase>;
 
 type ChatItem = {
   id: string;
@@ -133,49 +74,24 @@ const starterPrompts = [
   'أنا محبط ومش شايف نتيجة'
 ];
 
-const formatUpdatedAt = (value: string) => {
-  const date = new Date(value);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMinutes < 1) return 'Just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
-};
-
-const buildConversationTitle = (message: string) => {
-  const normalized = message.replace(/\s+/g, ' ').trim();
-  if (!normalized) return 'New chat';
-  return normalized.length > 42 ? `${normalized.slice(0, 42).trim()}...` : normalized;
-};
-
 export default function AIAssistantView() {
   const apiBaseUrl = import.meta.env.VITE_CHATBOT_API_URL;
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
 
   const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations] = useState<Conversation[]>([]); // Static empty to prevent TS errors
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [connected, setConnected] = useState<'unknown' | 'online' | 'offline'>('unknown');
-  const [loadingConversations, setLoadingConversations] = useState(false);
-  const [loadingMessages, setLoadingMessages] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const hasReachedLimit = messages.length >= MESSAGE_LIMIT;
   const remainingMessages = Math.max(MESSAGE_LIMIT - messages.length, 0);
-  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId);
 
   const userProfilePayload = useMemo(() => {
     if (!user) return null;
@@ -194,90 +110,12 @@ export default function AIAssistantView() {
     };
   }, [profile, user]);
 
-  const fetchConversations = useCallback(async (preferredConversationId?: string | null) => {
-    if (!user?.id) {
-      setConversations([]);
-      setActiveConversationId(null);
-      setMessages([]);
-      return;
-    }
-
-    setLoadingConversations(true);
-    try {
-      // Use backend endpoint instead of Supabase directly (avoids RLS issues)
-      const response = await fetch(`${apiBaseUrl}/api/chat/conversations?user_id=${user.id}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch conversations: ${response.status}`);
-      }
-
-      const rows = (await response.json()) as Conversation[];
-      setConversations(rows);
-
-      if (preferredConversationId === null) return;
-
-      setActiveConversationId((current) => {
-        if (preferredConversationId) return preferredConversationId;
-        if (current && rows.some((conversation) => conversation.id === current)) return current;
-        return rows[0]?.id ?? null;
-      });
-    } catch (error) {
-      console.error('Failed to fetch chatbot conversations:', error);
-      toast({
-        title: 'Could not load chat history',
-        description: error instanceof Error ? error.message : 'Please try again.'
-      });
-    } finally {
-      setLoadingConversations(false);
-    }
-  }, [apiBaseUrl, toast, user?.id]);
-
-  const fetchMessages = useCallback(async (conversationId: string | null) => {
-    if (!conversationId || !user?.id) {
-      setMessages([]);
-      return;
-    }
-
-    setLoadingMessages(true);
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/chat/conversations/${conversationId}/messages?user_id=${user.id}`
-      );
-      if (!response.ok) {
-        throw new Error(`Failed to fetch messages: ${response.status}`);
-      }
-
-      const data = (await response.json()) as StoredChatMessage[];
-      setMessages(
-        data.map((message) => ({
-          id: message.id,
-          role: message.role,
-          content: message.content,
-          created_at: message.created_at
-        }))
-      );
-    } catch (error) {
-      console.error('Failed to fetch chatbot messages:', error);
-      toast({
-        title: 'Could not load messages',
-        description: error instanceof Error ? error.message : 'Please try again.'
-      });
-    } finally {
-      setLoadingMessages(false);
-    }
-  }, [apiBaseUrl, toast, user?.id]);
-
-  useEffect(() => {
-    if (authLoading) return;
-    void fetchConversations();
-  }, [fetchConversations, authLoading]);
-
-  useEffect(() => {
-    void fetchMessages(activeConversationId);
-  }, [activeConversationId, fetchMessages]);
+  /* تم إيقاف الـ useEffects الخاصة بجلب المحادثات مؤقتاً لتجنب الـ 404 
+  */
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sending, loadingMessages]);
+  }, [messages, sending]);
 
   useEffect(() => {
     const checkBackend = async () => {
@@ -293,84 +131,13 @@ export default function AIAssistantView() {
     void checkBackend();
   }, [apiBaseUrl]);
 
-  const createConversation = async (title = 'New chat', resetMessages = true) => {
-    if (!user?.id) {
-      toast({ title: 'Sign in required', description: 'Please sign in to create a chat.' });
-      return null;
-    }
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/chat/conversations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id, title })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to create conversation: ${response.status}`);
-      }
-
-      const conversation = (await response.json()) as Conversation;
-      setConversations((current) => [conversation, ...current]);
-      setActiveConversationId(conversation.id);
-      if (resetMessages) {
-        setMessages([]);
-        setInput('');
-      }
-      setSessionId(crypto.randomUUID());
-      setSidebarOpen(false);
-      return conversation;
-    } catch (error) {
-      console.error('Failed to create chatbot conversation:', error);
-      toast({
-        title: 'Could not create chat',
-        description: error instanceof Error ? error.message : 'Please try again.'
-      });
-      throw error;
-    }
-  };
-
-  const ensureConversation = async (firstMessage: string) => {
-    if (activeConversationId) return activeConversationId;
-    const conversation = await createConversation(buildConversationTitle(firstMessage), false);
-    return conversation?.id ?? null;
-  };
-
-  const updateConversationAfterMessage = async (conversationId: string, title?: string) => {
-    if (!user?.id) return;
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/chat/conversations/${conversationId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id, title })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update conversation: ${response.status}`);
-      }
-
-      const updated = (await response.json()) as Conversation;
-      setConversations((current) => [updated, ...current.filter((conversation) => conversation.id !== conversationId)]);
-    } catch (error) {
-      console.error('Failed to update conversation:', error);
-    }
-  };
-
-  const saveMessage = async (conversationId: string, role: ChatItem['role'], content: string) => {
-    if (!user?.id) throw new Error('User not authenticated');
-
-    const response = await fetch(`${apiBaseUrl}/api/chat/conversations/${conversationId}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, role, content })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to save message: ${response.status}`);
-    }
-
-    return (await response.json()) as { id: string; role: ChatItem['role']; content: string; created_at: string };
+  // دالة New Chat تعمل محلياً بالكامل الآن
+  const handleNewChat = () => {
+    setMessages([]);
+    setInput('');
+    setSessionId(crypto.randomUUID());
+    setActiveConversationId(null);
+    setSidebarOpen(false);
   };
 
   const appendMessage = (item: ChatItem) => {
@@ -387,50 +154,6 @@ export default function AIAssistantView() {
     );
   };
 
-  const handleNewChat = async () => {
-    try {
-      await createConversation();
-    } catch (error) {
-      console.error('Failed to create chatbot conversation:', error);
-      toast({
-        title: 'Could not create chat',
-        description: error instanceof Error ? error.message : 'Please try again.'
-      });
-    }
-  };
-
-  const deleteConversation = async (conversation: Conversation) => {
-    const confirmed = window.confirm(`Delete "${conversation.title || 'New chat'}"? This cannot be undone.`);
-    if (!confirmed || !user?.id) return;
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/chat/conversations/${conversation.id}?user_id=${user.id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete conversation: ${response.status}`);
-      }
-
-      setConversations((current) => {
-        const next = current.filter((item) => item.id !== conversation.id);
-        if (activeConversationId === conversation.id) {
-          setActiveConversationId(next[0]?.id ?? null);
-          if (!next.length) setMessages([]);
-        }
-        return next;
-      });
-
-      toast({ title: 'Conversation deleted' });
-    } catch (error) {
-      console.error('Failed to delete chatbot conversation:', error);
-      toast({
-        title: 'Could not delete chat',
-        description: error instanceof Error ? error.message : 'Please try again.'
-      });
-    }
-  };
-
   const sendMessage = async (query: string) => {
     const trimmed = query.trim();
 
@@ -444,10 +167,7 @@ export default function AIAssistantView() {
       return;
     }
 
-    const wasFirstMessage = messages.length === 0;
-    const title = wasFirstMessage ? buildConversationTitle(trimmed) : undefined;
     const userMessageId = crypto.randomUUID();
-    let conversationId: string | null = null;
     let assistantMessageId: string | null = null;
     let assistantContent = '';
 
@@ -456,20 +176,6 @@ export default function AIAssistantView() {
     setSending(true);
 
     try {
-      conversationId = await ensureConversation(trimmed);
-      if (!conversationId) throw new Error('No active conversation was created.');
-
-      if (title) await updateConversationAfterMessage(conversationId, title);
-
-      const savedUserMessage = await saveMessage(conversationId, 'user', trimmed);
-      updateMessage(userMessageId, { id: savedUserMessage.id, created_at: savedUserMessage.created_at });
-      await updateConversationAfterMessage(conversationId);
-
-      if (messages.length + 1 >= MESSAGE_LIMIT) {
-        setConnected('online');
-        return;
-      }
-
       assistantMessageId = crypto.randomUUID();
       appendMessage({ id: assistantMessageId, role: 'assistant', content: '' });
 
@@ -478,10 +184,9 @@ export default function AIAssistantView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: trimmed,
-          session_id: sessionId || undefined,
-          conversation_id: conversationId,
           user_id: user?.id,
-          user_profile: userProfilePayload || undefined,
+          session_id: sessionId,
+          user_profile: userProfilePayload || undefined, // تم الحفاظ عليه لذكاء الموديل
           stream: true
         })
       });
@@ -565,24 +270,13 @@ export default function AIAssistantView() {
         }
       }
 
-      if (assistantContent.trim()) {
-        const savedAssistantMessage = await saveMessage(conversationId, 'assistant', assistantContent);
-        updateMessage(assistantMessageId, {
-          id: savedAssistantMessage.id,
-          created_at: savedAssistantMessage.created_at
-        });
-        await updateConversationAfterMessage(conversationId);
-      }
-
       setConnected('online');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '';
-      appendMessage({
-        id: crypto.randomUUID(),
-        role: 'assistant',
+      updateMessage(assistantMessageId, {
         content: errorMessage
           ? `حدث خطأ أثناء معالجة الطلب: ${errorMessage}`
-          : 'تعذر الاتصال بالشات بوت الآن. تأكد أن خدمة chatbot تعمل ثم أعد المحاولة.'
+          : 'تعذر الاتصال بالشات بوت الآن. تأكد أن خدمة الجلسة تعمل ثم أعد المحاولة.'
       });
       setConnected('offline');
       toast({
@@ -599,25 +293,12 @@ export default function AIAssistantView() {
     }
   };
 
-  const handleConversationClick = (conversationId: string) => {
-    setActiveConversationId(conversationId);
-    setSidebarOpen(false);
-    setSessionId(crypto.randomUUID());
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      void sendMessage(input);
-    }
-  };
-
   const conversationSidebar = (
     <aside className="flex h-full min-h-0 flex-col border-r border-border/70 bg-background/95">
       <div className="flex items-center justify-between gap-3 border-b border-border/70 p-4">
         <div className="min-w-0">
           <p className="font-semibold">Chat history</p>
-          <p className="text-xs text-muted-foreground">{conversations.length} conversations</p>
+          <p className="text-xs text-muted-foreground">Session Mode</p>
         </div>
         <Button type="button" size="icon" variant="ghost" className="lg:hidden" onClick={() => setSidebarOpen(false)}>
           <X className="h-4 w-4" />
@@ -625,63 +306,16 @@ export default function AIAssistantView() {
       </div>
 
       <div className="p-3">
-        <Button type="button" className="w-full justify-start gap-2 rounded-xl" onClick={() => void handleNewChat()}>
+        <Button type="button" className="w-full justify-start gap-2 rounded-xl" onClick={handleNewChat}>
           <Plus className="h-4 w-4" />
           New Chat
         </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        {loadingConversations ? (
-          <div className="flex items-center gap-2 rounded-xl border border-border/70 p-3 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading chats...
-          </div>
-        ) : conversations.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/80 p-4 text-sm text-muted-foreground">
-            No conversations yet. Start a new chat to keep your coaching history here.
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {conversations.map((conversation) => {
-              const isActive = conversation.id === activeConversationId;
-
-              return (
-                <div
-                  key={conversation.id}
-                  className={`group flex items-center gap-2 rounded-xl border px-3 py-2 transition ${
-                    isActive
-                      ? 'border-primary/50 bg-primary/10 shadow-sm'
-                      : 'border-transparent hover:border-border/80 hover:bg-muted/70'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => handleConversationClick(conversation.id)}
-                  >
-                    <span className="flex items-center gap-2">
-                      <MessageSquare className={`h-4 w-4 shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                      <span className="truncate text-sm font-medium">{conversation.title || 'New chat'}</span>
-                    </span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {formatUpdatedAt(conversation.updated_at)}
-                    </span>
-                  </button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 shrink-0 opacity-70 hover:opacity-100"
-                    onClick={() => void deleteConversation(conversation)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div className="rounded-xl border border-dashed border-border/80 p-4 text-sm text-muted-foreground text-center">
+          وضع الجلسة المؤقت نشط. المحادثات الحالية لن يتم حفظها في قاعدة البيانات.
+        </div>
       </div>
     </aside>
   );
@@ -714,14 +348,14 @@ export default function AIAssistantView() {
                   <Sparkles className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-lg font-bold">{activeConversation?.title || 'FitMentor AI'}</p>
+                  <p className="truncate text-lg font-bold">FitMentor AI (Live Session)</p>
                   <p className="text-xs font-normal text-muted-foreground">
                     {remainingMessages} of {MESSAGE_LIMIT} messages remaining
                   </p>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                   {hasReachedLimit && (
-                    <Button type="button" size="sm" className="hidden gap-2 sm:inline-flex" onClick={() => void handleNewChat()}>
+                    <Button type="button" size="sm" className="hidden gap-2 sm:inline-flex" onClick={handleNewChat}>
                       <Plus className="h-4 w-4" />
                       New Chat
                     </Button>
@@ -740,96 +374,89 @@ export default function AIAssistantView() {
 
             <CardContent className="flex min-h-0 flex-1 flex-col p-0">
               <div className="min-h-0 flex-1 overflow-y-auto scroll-smooth bg-gradient-to-b from-background to-muted/40 p-4 md:p-6">
-                {loadingMessages ? (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading messages...
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {messages.length === 0 && (
-                      <div className="mx-auto flex max-w-2xl flex-col items-center justify-center rounded-3xl border border-border/40 bg-card/40 p-8 text-center backdrop-blur-sm shadow-sm relative overflow-hidden">
-                        <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
-                        <div className="absolute -bottom-24 -left-24 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
-                        <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/80 to-primary shadow-glow relative z-10">
-                          <Bot className="h-8 w-8 text-primary-foreground" />
-                        </div>
-                        <h2 className="text-2xl font-bold mb-2 relative z-10">مرحباً! كيف يمكنني مساعدتك اليوم؟</h2>
-                        <p className="text-muted-foreground mb-8 relative z-10 max-w-md">
-                          أنا مساعدك الذكي في FitMentor. يمكنك سؤالي عن التمارين، التغذية، أو أي شيء يخص رحلتك الرياضية.
-                        </p>
-                        
-                        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 relative z-10">
-                          {starterPrompts.map((prompt) => (
-                            <button
-                              key={prompt}
-                              type="button"
-                              onClick={() => void sendMessage(prompt)}
-                              className="group flex flex-col items-start gap-2 rounded-2xl border border-border/50 bg-background/50 p-4 text-right transition-all hover:-translate-y-1 hover:border-primary/50 hover:bg-card hover:shadow-md"
-                            >
-                              <span className="text-sm font-medium">{prompt}</span>
-                              <div className="flex w-full items-center justify-between mt-1">
-                                <span className="text-xs text-muted-foreground">اضغط للإرسال</span>
-                                <Sparkles className="h-3 w-3 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
-                              </div>
-                            </button>
-                          ))}
-                        </div>
+                <div className="space-y-4">
+                  {messages.length === 0 && (
+                    <div className="mx-auto flex max-w-2xl flex-col items-center justify-center rounded-3xl border border-border/40 bg-card/40 p-8 text-center backdrop-blur-sm shadow-sm relative overflow-hidden">
+                      <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
+                      <div className="absolute -bottom-24 -left-24 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
+                      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/80 to-primary shadow-glow relative z-10">
+                        <Bot className="h-8 w-8 text-primary-foreground" />
                       </div>
-                    )}
+                      <h2 className="text-2xl font-bold mb-2 relative z-10">مرحباً بك في جلسة التوجيه المباشرة!</h2>
+                      <p className="text-muted-foreground mb-8 relative z-10 max-w-md">
+                        أنا مساعدك الذكي في FitMentor. يمكنك سؤالي عن التمارين، التغذية، أو أي شيء يخص رحلتك الرياضية.
+                      </p>
 
-                    {messages.map((message) => (
-                      <div key={message.id} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        {message.role === 'assistant' && (
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-primary shadow-glow">
-                            <Bot className="h-4 w-4 text-primary-foreground" />
-                          </div>
-                        )}
-
-                        <div
-                          className={`max-w-[85%] rounded-2xl border px-4 py-3 shadow-sm ${
-                            message.role === 'user'
-                              ? 'border-transparent bg-gradient-primary text-primary-foreground rounded-br-sm'
-                              : 'border-border/50 bg-card/80 backdrop-blur-sm text-foreground rounded-bl-sm'
-                          }`}
-                        >
-                          <div dir="auto" className="whitespace-pre-wrap text-sm leading-relaxed md:text-[15px]">
-                            {message.content || (message.role === 'assistant' && sending ? (
-                              <span className="inline-flex items-center gap-1 text-muted-foreground" aria-label="thinking">
-                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" />
-                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" style={{ animationDelay: '0.15s' }} />
-                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" style={{ animationDelay: '0.3s' }} />
-                              </span>
-                            ) : null)}
-                          </div>
-                        </div>
-
-                        {message.role === 'user' && (
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-secondary">
-                            <User className="h-4 w-4 text-foreground" />
-                          </div>
-                        )}
+                      <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 relative z-10">
+                        {starterPrompts.map((prompt) => (
+                          <button
+                            key={prompt}
+                            type="button"
+                            onClick={() => void sendMessage(prompt)}
+                            className="group flex flex-col items-start gap-2 rounded-2xl border border-border/50 bg-background/50 p-4 text-right transition-all hover:-translate-y-1 hover:border-primary/50 hover:bg-card hover:shadow-md"
+                          >
+                            <span className="text-sm font-medium">{prompt}</span>
+                            <div className="flex w-full items-center justify-between mt-1">
+                              <span className="text-xs text-muted-foreground">اضغط للإرسال</span>
+                              <Sparkles className="h-3 w-3 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+                  )}
 
-                    {sending && !messages.some((message) => message.role === 'assistant' && !message.content) && (
-                      <div className="flex items-start justify-start gap-3">
+                  {messages.map((message) => (
+                    <div key={message.id} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      {message.role === 'assistant' && (
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-primary shadow-glow">
                           <Bot className="h-4 w-4 text-primary-foreground" />
                         </div>
-                        <div className="max-w-[85%] rounded-2xl border border-border/70 bg-card px-4 py-3 text-foreground shadow-sm">
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground" aria-label="thinking">
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" />
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" style={{ animationDelay: '0.15s' }} />
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" style={{ animationDelay: '0.3s' }} />
-                          </div>
+                      )}
+
+                      <div
+                        className={`max-w-[85%] rounded-2xl border px-4 py-3 shadow-sm ${
+                          message.role === 'user'
+                            ? 'border-transparent bg-gradient-primary text-primary-foreground rounded-br-sm'
+                            : 'border-border/50 bg-card/80 backdrop-blur-sm text-foreground rounded-bl-sm'
+                        }`}
+                      >
+                        <div dir="auto" className="whitespace-pre-wrap text-sm leading-relaxed md:text-[15px]">
+                          {message.content || (message.role === 'assistant' && sending ? (
+                            <span className="inline-flex items-center gap-1 text-muted-foreground" aria-label="thinking">
+                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" />
+                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" style={{ animationDelay: '0.15s' }} />
+                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" style={{ animationDelay: '0.3s' }} />
+                            </span>
+                          ) : null)}
                         </div>
                       </div>
-                    )}
 
-                    <div ref={bottomRef} />
-                  </div>
-                )}
+                      {message.role === 'user' && (
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-secondary">
+                          <User className="h-4 w-4 text-foreground" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {sending && !messages.some((message) => message.role === 'assistant' && !message.content) && (
+                    <div className="flex items-start justify-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-primary shadow-glow">
+                        <Bot className="h-4 w-4 text-primary-foreground" />
+                      </div>
+                      <div className="max-w-[85%] rounded-2xl border border-border/70 bg-card px-4 py-3 text-foreground shadow-sm">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground" aria-label="thinking">
+                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" />
+                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" style={{ animationDelay: '0.15s' }} />
+                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/80" style={{ animationDelay: '0.3s' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={bottomRef} />
+                </div>
               </div>
 
               <div className="border-t border-border/70 bg-background/90 p-4 backdrop-blur md:p-5">
@@ -839,7 +466,7 @@ export default function AIAssistantView() {
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                       <span>This conversation has reached the 10-message limit. Start a new chat.</span>
                     </div>
-                    <Button type="button" size="sm" className="gap-2" onClick={() => void handleNewChat()}>
+                    <Button type="button" size="sm" className="gap-2" onClick={handleNewChat}>
                       <Plus className="h-4 w-4" />
                       New Chat
                     </Button>
@@ -852,16 +479,21 @@ export default function AIAssistantView() {
                       dir="auto"
                       value={input}
                       onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setInput(event.target.value)}
-                      onKeyDown={handleKeyDown}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                          event.preventDefault();
+                          void sendMessage(input);
+                        }
+                      }}
                       placeholder={hasReachedLimit ? 'Start a new chat to continue...' : 'اسألني أي شيء عن التمارين أو التغذية...'}
-                      disabled={sending || loadingMessages || hasReachedLimit}
+                      disabled={sending || hasReachedLimit}
                       className="min-h-[60px] max-h-[160px] resize-none rounded-2xl border-border/50 bg-background/50 backdrop-blur-sm px-4 py-4 pr-14 focus-visible:ring-primary/30 transition-all shadow-sm scrollbar-thin"
                     />
                     <Button
                       type="button"
                       size="icon"
                       onClick={() => void sendMessage(input)}
-                      disabled={sending || loadingMessages || hasReachedLimit || !input.trim()}
+                      disabled={sending || hasReachedLimit || !input.trim()}
                       className="absolute bottom-2 right-2 h-[44px] w-[44px] rounded-xl transition-all shadow-glow hover:scale-105 active:scale-95"
                     >
                       {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 rtl:-scale-x-100" />}
