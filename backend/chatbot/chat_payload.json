@@ -1,0 +1,5 @@
+{
+  "query": "hello",
+  "session_id": "test-session",
+  "stream": false
+}
